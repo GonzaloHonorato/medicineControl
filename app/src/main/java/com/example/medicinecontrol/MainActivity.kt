@@ -18,7 +18,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MedicineControlTheme {
-                // Control de navegacion basico
                 var screen by remember { mutableStateOf("login") }
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
@@ -30,7 +29,8 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToRecover = { screen = "recover" }
                             )
                             "register" -> RegisterView(
-                                onRegistered = { screen = "login" }
+                                onRegistered = { screen = "login" },
+                                onNavigateToLogin = { screen = "login" }
                             )
                             "recover" -> RecoverPasswordView(
                                 onBack = { screen = "login" }

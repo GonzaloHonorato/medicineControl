@@ -70,7 +70,7 @@ fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateT
 }
 
 @Composable
-fun RegisterView(onRegistered: () -> Unit) {
+fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
     var nombre by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
@@ -130,6 +130,13 @@ fun RegisterView(onRegistered: () -> Unit) {
             modifier = Modifier.fillMaxWidth().height(60.dp)
         ) {
             Text("Registrarme", fontSize = 18.sp)
+        }
+
+        TextButton(
+            onClick = onNavigateToLogin,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        ) {
+            Text("Ya tiene una cuenta, inicie sesión", fontSize = 16.sp)
         }
     }
 }
