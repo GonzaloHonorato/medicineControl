@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -17,28 +18,28 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MedicineControlTheme {
-                var currentScreen by remember { mutableStateOf("login") }
+                // Control de navegacion basico
+                var screen by remember { mutableStateOf("login") }
 
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Modifier.padding(innerPadding).let { _ ->
-                        // Navegacion simple por estados
-                        when (currentScreen) {
+                Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+                    Box(modifier = Modifier.padding(padding)) {
+                        when (screen) {
                             "login" -> LoginView(
-                                onLogin = { currentScreen = "home" },
-                                onNavigateToRegister = { currentScreen = "register" },
-                                onNavigateToRecover = { currentScreen = "recover" }
+                                onLogin = { screen = "home" },
+                                onNavigateToRegister = { screen = "register" },
+                                onNavigateToRecover = { screen = "recover" }
                             )
                             "register" -> RegisterView(
-                                onRegistered = { currentScreen = "login" }
+                                onRegistered = { screen = "login" }
                             )
                             "recover" -> RecoverPasswordView(
-                                onBack = { currentScreen = "login" }
+                                onBack = { screen = "login" }
                             )
                             "home" -> HomeView(
-                                onAddMedication = { currentScreen = "add_med" }
+                                onAddMedication = { screen = "add_med" }
                             )
                             "add_med" -> MedicationFormView(
-                                onSaved = { currentScreen = "home" }
+                                onSaved = { screen = "home" }
                             )
                         }
                     }
