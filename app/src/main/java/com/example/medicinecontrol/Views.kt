@@ -193,16 +193,20 @@ fun HomeView(onAddMedication: () -> Unit) {
         }
     }
 
+    // Ordenar medicamentos por el tiempo restante más corto
+    val sortedMeds = meds.sortedBy { med ->
+        calculateDurationUntilNext(med, now).toSeconds()
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Próximos medicamentos", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(modifier = Modifier.height(20.dp))
         
-        if (meds.isEmpty()) {
+        if (sortedMeds.isEmpty()) {
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 Text("No hay registros", fontSize = 18.sp, color = Color.Gray)
             }
         } else {
-            val sortedMeds = meds.sortedBy { it.horaInicial }
             val next = sortedMeds.first()
             val remaining = sortedMeds.drop(1)
 
@@ -235,13 +239,15 @@ fun HomeView(onAddMedication: () -> Unit) {
 
 @Composable
 fun MedicationCard(med: Medicamento, now: LocalTime, isNext: Boolean) {
-    val duration = Duration.between(now, med.horaInicial)
-    val timeStr = if (duration.isNegative) "Ahora" else {
-        val h = duration.toHours()
-        val m = duration.toMinutes() % 60
-        val s = duration.seconds % 60
-        "Faltan %02d:%02d:%02d".format(h, m, s)
-    }
+    val duration = calculateDurationUntilNext(med, now)
+    
+    val h = duration.toHours()
+    val m = duration.toMinutes() % 60
+    val s = duration.seconds % 60
+    val timeStr = if (duration.isZero || (duration.toSeconds() < 5)) "¡Ahora!" 
+                 else "Faltan %02d:%02d:%02d".format(h, m, s)
+
+    val nextDoseTime = now.plus(duration)
 
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -252,8 +258,8 @@ fun MedicationCard(med: Medicamento, now: LocalTime, isNext: Boolean) {
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(med.nombre, fontSize = if (isNext) 28.sp else 22.sp, fontWeight = FontWeight.Bold)
-            Text("Cantidad: ${med.dosis}", fontSize = 18.sp)
-            Text("Hora programada: ${med.horaInicial.format(DateTimeFormatter.ofPattern("HH:mm"))}", fontSize = 18.sp)
+            Text("Dosis: ${med.dosis}", fontSize = 18.sp)
+            Text("Próxima toma: ${nextDoseTime.format(DateTimeFormatter.ofPattern("HH:mm"))}", fontSize = 18.sp)
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = timeStr,
@@ -265,13 +271,29 @@ fun MedicationCard(med: Medicamento, now: LocalTime, isNext: Boolean) {
     }
 }
 
+fun calculateDurationUntilNext(med: Medicamento, now: LocalTime): Duration {
+    val nowSec = now.toSecondOfDay()
+    val startSec = med.horaInicial.toSecondOfDay()
+    val intervalSec = med.intervaloHoras * 3600
+    
+    var diff = (startSec - nowSec).toLong()
+    if (intervalSec > 0) {
+        while (diff < 0) {
+            diff += intervalSec
+        }
+    } else {
+        if (diff < 0) diff += 86400
+    }
+    return Duration.ofSeconds(diff)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MedicationFormView(onSaved: () -> Unit) {
     var nombre by remember { mutableStateOf("") }
     var dosis by remember { mutableStateOf("") }
     var intervaloSelected by remember { mutableStateOf(8) }
-    var selectedTime by remember { mutableStateOf(LocalTime.of(8, 0)) }
+    var selectedTime by remember { mutableStateOf(LocalTime.now().withSecond(0).withNano(0)) }
     var showTimePicker by remember { mutableStateOf(false) }
     var diario by remember { mutableStateOf(true) }
 
