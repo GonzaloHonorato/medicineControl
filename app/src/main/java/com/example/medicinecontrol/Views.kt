@@ -66,6 +66,20 @@ fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateT
         TextButton(onClick = onNavigateToRegister) {
             Text("Crear cuenta", fontSize = 16.sp)
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        OutlinedButton(
+            onClick = {
+                val demoUser = Repository.usuarios.firstOrNull()
+                if (demoUser != null) {
+                    email = demoUser.email
+                    password = demoUser.contrasena
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Usar datos demo")
+        }
     }
 }
 
@@ -242,13 +256,34 @@ fun MedicationCard(med: Medicamento, now: LocalTime, isNext: Boolean) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MedicationFormView(onSaved: () -> Unit) {
     var nombre by remember { mutableStateOf("") }
     var dosis by remember { mutableStateOf("") }
-    var horas by remember { mutableStateOf("") }
-    var horaIni by remember { mutableStateOf("") }
+    var intervaloSelected by remember { mutableStateOf(8) }
+    var selectedTime by remember { mutableStateOf(LocalTime.of(8, 0)) }
+    var showTimePicker by remember { mutableStateOf(false) }
     var diario by remember { mutableStateOf(true) }
+
+    val timeState = rememberTimePickerState(
+        initialHour = selectedTime.hour,
+        initialMinute = selectedTime.minute
+    )
+
+    if (showTimePicker) {
+        TimePickerDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedTime = LocalTime.of(timeState.hour, timeState.minute)
+                    showTimePicker = false
+                }) { Text("Confirmar") }
+            }
+        ) {
+            TimePicker(state = timeState)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState())) {
         Text("Nuevo Medicamento", fontSize = 28.sp, fontWeight = FontWeight.Bold)
@@ -257,35 +292,67 @@ fun MedicationFormView(onSaved: () -> Unit) {
         TextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(12.dp))
         TextField(value = dosis, onValueChange = { dosis = it }, label = { Text("Dosis") }, modifier = Modifier.fillMaxWidth())
+        
+        Spacer(modifier = Modifier.height(20.dp))
+        Text("Intervalo de tomas (horas):", fontWeight = FontWeight.Bold)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            listOf(4, 6, 8, 12, 24).forEach { hours ->
+                FilterChip(
+                    selected = intervaloSelected == hours,
+                    onClick = { intervaloSelected = hours },
+                    label = { Text("${hours}h") }
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
-        TextField(value = horas, onValueChange = { horas = it }, label = { Text("Intervalo (horas)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(12.dp))
-        TextField(value = horaIni, onValueChange = { horaIni = it }, label = { Text("Hora inicio (HH:mm)") }, modifier = Modifier.fillMaxWidth())
+        Text("Hora de la primera toma:", fontWeight = FontWeight.Bold)
+        OutlinedButton(
+            onClick = { showTimePicker = true },
+            modifier = Modifier.fillMaxWidth().height(56.dp)
+        ) {
+            Text(selectedTime.format(DateTimeFormatter.ofPattern("HH:mm")), fontSize = 18.sp)
+        }
         
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 12.dp)) {
             Checkbox(checked = diario, onCheckedChange = { diario = it })
-            Text("Repetir diario", fontSize = 18.sp)
+            Text("Repetir diariamente", fontSize = 18.sp)
         }
 
+        Spacer(modifier = Modifier.height(16.dp))
         Button(
             onClick = {
-                try {
-                    val time = LocalTime.parse(horaIni)
-                    Repository.agregarMedicamento(Medicamento(nombre, dosis, horas.toIntOrNull() ?: 0, time, diario))
+                if (nombre.isNotBlank()) {
+                    Repository.agregarMedicamento(Medicamento(nombre, dosis, intervaloSelected, selectedTime, diario))
                     onSaved()
-                } catch (e: Exception) {}
+                }
             },
             modifier = Modifier.fillMaxWidth().height(60.dp)
         ) {
-            Text("Guardar", fontSize = 20.sp)
+            Text("Guardar Medicamento", fontSize = 20.sp)
         }
         
         if (Repository.medicamentos.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(24.dp))
-            Text("Lista actual:", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(32.dp))
+            Text("Resumen de ingresos:", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Repository.medicamentos.forEach {
-                Text("• ${it.nombre} - ${it.dosis}", fontSize = 16.sp)
+                Text("• ${it.nombre} (${it.dosis}) cada ${it.intervaloHoras}h", fontSize = 16.sp)
             }
         }
     }
+}
+
+@Composable
+fun TimePickerDialog(
+    onDismissRequest: () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    dismissButton: @Composable (() -> Unit)? = null,
+    content: @Composable () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        confirmButton = confirmButton,
+        dismissButton = dismissButton,
+        text = { content() }
+    )
 }
