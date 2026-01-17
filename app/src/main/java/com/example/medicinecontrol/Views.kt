@@ -21,24 +21,22 @@ import java.time.Duration
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-// Pantalla de acceso
 @Composable
 fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateToRecover: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf("") }
+    var errorMsg by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("MedicineControl", fontSize = 34.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(32.dp))
+        Text("MedicineControl", fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(40.dp))
         
-        TextField(value = email, onValueChange = { email = it }, label = { Text("Correo electrónico") }, modifier = Modifier.fillMaxWidth())
+        TextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(16.dp))
-        
         TextField(
             value = password, 
             onValueChange = { password = it }, 
@@ -47,16 +45,15 @@ fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateT
             modifier = Modifier.fillMaxWidth()
         )
         
-        if (error.isNotEmpty()) {
-            Text(error, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
+        if (errorMsg.isNotEmpty()) {
+            Text(errorMsg, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
         }
 
         Spacer(modifier = Modifier.height(32.dp))
-        
         Button(
             onClick = {
                 val user = Repository.usuarios.find { it.email == email && it.contrasena == password }
-                if (user != null) onLogin() else error = "Email o contraseña incorrectos"
+                if (user != null) onLogin() else errorMsg = "Usuario o clave incorrecta"
             },
             modifier = Modifier.fillMaxWidth().height(60.dp)
         ) {
@@ -66,62 +63,57 @@ fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateT
         TextButton(onClick = onNavigateToRecover) {
             Text("¿Olvidaste tu contraseña?", fontSize = 16.sp)
         }
-        
         TextButton(onClick = onNavigateToRegister) {
             Text("Crear cuenta", fontSize = 16.sp)
         }
     }
 }
 
-// Pantalla de nuevo usuario
 @Composable
 fun RegisterView(onRegistered: () -> Unit) {
     var nombre by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
-    var confirmPass by remember { mutableStateOf("") }
-    var acceptTerms by remember { mutableStateOf(false) }
-    var isLargeText by remember { mutableStateOf(false) }
-    var reminderType by remember { mutableStateOf("Visual") }
-    var expanded by remember { mutableStateOf(false) }
-
-    val options = listOf("Visual", "Visual + Sonido")
+    var confirm by remember { mutableStateOf("") }
+    var accept by remember { mutableStateOf(false) }
+    var largeText by remember { mutableStateOf(false) }
+    var recordatorio by remember { mutableStateOf("Visual") }
+    var menuOpen by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState())) {
-        Text("Crear Cuenta", fontSize = 28.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(20.dp))
+        Text("Registro", fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(24.dp))
 
-        TextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre completo") }, modifier = Modifier.fillMaxWidth())
+        TextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(12.dp))
         TextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(12.dp))
         TextField(value = pass, onValueChange = { pass = it }, label = { Text("Contraseña") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(12.dp))
-        TextField(value = confirmPass, onValueChange = { confirmPass = it }, label = { Text("Confirmar contraseña") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        TextField(value = confirm, onValueChange = { confirm = it }, label = { Text("Confirmar") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
         
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
-            Checkbox(checked = acceptTerms, onCheckedChange = { acceptTerms = it })
-            Text("Acepto los términos y condiciones", fontSize = 16.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+            Checkbox(checked = accept, onCheckedChange = { accept = it })
+            Text("Acepto términos", fontSize = 16.sp)
         }
 
-        Text("Preferencia de accesibilidad:", fontWeight = FontWeight.Bold)
+        Text("Accesibilidad:", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(selected = !isLargeText, onClick = { isLargeText = false })
+            RadioButton(selected = !largeText, onClick = { largeText = false })
             Text("Normal")
             Spacer(modifier = Modifier.width(16.dp))
-            RadioButton(selected = isLargeText, onClick = { isLargeText = true })
-            Text("Texto grande")
+            RadioButton(selected = largeText, onClick = { largeText = true })
+            Text("Grande")
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("Tipo de recordatorio:", fontWeight = FontWeight.Bold)
+        Text("Recordatorio:", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
         Box {
-            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(reminderType)
+            OutlinedButton(onClick = { menuOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(recordatorio)
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                options.forEach { opt ->
-                    DropdownMenuItem(text = { Text(opt) }, onClick = { reminderType = opt; expanded = false })
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                listOf("Visual", "Visual + Sonido").forEach {
+                    DropdownMenuItem(text = { Text(it) }, onClick = { recordatorio = it; menuOpen = false })
                 }
             }
         }
@@ -129,9 +121,10 @@ fun RegisterView(onRegistered: () -> Unit) {
         Spacer(modifier = Modifier.height(32.dp))
         Button(
             onClick = {
-                if (pass == confirmPass && pass.isNotEmpty() && acceptTerms) {
-                    val success = Repository.agregarUsuario(User(nombre, email, pass, isLargeText, reminderType.contains("Visual")))
-                    if (success) onRegistered()
+                if (pass == confirm && accept && nombre.isNotBlank()) {
+                    if (Repository.agregarUsuario(User(nombre, email, pass, largeText, recordatorio == "Visual"))) {
+                        onRegistered()
+                    }
                 }
             },
             modifier = Modifier.fillMaxWidth().height(60.dp)
@@ -141,41 +134,37 @@ fun RegisterView(onRegistered: () -> Unit) {
     }
 }
 
-// Pantalla para recuperar acceso
 @Composable
 fun RecoverPasswordView(onBack: () -> Unit) {
     var email by remember { mutableStateOf("") }
-    var mensaje by remember { mutableStateOf("") }
+    var enviado by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
-        Text("Recuperar Contraseña", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Text("Recuperar acceso", fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
         TextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Se enviará un enlace con instrucciones para restablecer su contraseña.", fontSize = 16.sp)
+        Text("Se enviará un enlace de recuperación a su correo.", fontSize = 16.sp)
         
-        if (mensaje.isNotEmpty()) {
-            Text(mensaje, color = Color(0xFF388E3C), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
+        if (enviado) {
+            Text("Enviado correctamente.", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
         }
 
         Spacer(modifier = Modifier.height(32.dp))
-        Button(onClick = { mensaje = "Enlace enviado a $email" }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+        Button(onClick = { enviado = true }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
             Text("Enviar instrucciones")
         }
-        
         TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-            Text("Volver al inicio", fontSize = 16.sp)
+            Text("Volver", fontSize = 16.sp)
         }
     }
 }
 
-// Pantalla principal de seguimiento
 @Composable
 fun HomeView(onAddMedication: () -> Unit) {
     val meds = Repository.medicamentos
     var now by remember { mutableStateOf(LocalTime.now()) }
 
-    // Actualiza el tiempo cada segundo
     LaunchedEffect(Unit) {
         while (true) {
             now = LocalTime.now()
@@ -184,17 +173,31 @@ fun HomeView(onAddMedication: () -> Unit) {
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Próximos medicamentos", fontSize = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 16.dp))
+        Text("Próximos medicamentos", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+        Spacer(modifier = Modifier.height(20.dp))
         
         if (meds.isEmpty()) {
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Text("No hay medicamentos programados", fontSize = 18.sp, color = Color.Gray)
+                Text("No hay registros", fontSize = 18.sp, color = Color.Gray)
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
-                items(meds) { med ->
-                    MedicationCard(med, now)
+            val sortedMeds = meds.sortedBy { it.horaInicial }
+            val next = sortedMeds.first()
+            val remaining = sortedMeds.drop(1)
+
+            Text("Próximo ahora:", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            MedicationCard(next, now, true)
+            
+            if (remaining.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Siguientes tomas:", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                    items(remaining) { med ->
+                        MedicationCard(med, now, false)
+                    }
                 }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
 
@@ -202,15 +205,15 @@ fun HomeView(onAddMedication: () -> Unit) {
             onClick = onAddMedication,
             modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp).height(64.dp)
         ) {
-            Text("Agregar medicamento", fontSize = 20.sp)
+            Text("Agregar medicamento", fontSize = 22.sp)
         }
     }
 }
 
 @Composable
-fun MedicationCard(med: Medicamento, now: LocalTime) {
+fun MedicationCard(med: Medicamento, now: LocalTime, isNext: Boolean) {
     val duration = Duration.between(now, med.horaInicial)
-    val diffText = if (duration.isNegative) "Hora de la toma" else {
+    val timeStr = if (duration.isNegative) "Ahora" else {
         val h = duration.toHours()
         val m = duration.toMinutes() % 60
         val s = duration.seconds % 60
@@ -219,70 +222,62 @@ fun MedicationCard(med: Medicamento, now: LocalTime) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        colors = if (isNext) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer) 
+                 else CardDefaults.cardColors()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(med.nombre, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text(med.nombre, fontSize = if (isNext) 26.sp else 22.sp, fontWeight = FontWeight.Bold)
             Text("Dosis: ${med.dosis}", fontSize = 18.sp)
-            Text("Programado: ${med.horaInicial.format(DateTimeFormatter.ofPattern("HH:mm"))}", fontSize = 18.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(diffText, fontSize = 20.sp, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+            Text("Hora: ${med.horaInicial.format(DateTimeFormatter.ofPattern("HH:mm"))}", fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(timeStr, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
         }
     }
 }
 
-// Pantalla para añadir medicamento
 @Composable
 fun MedicationFormView(onSaved: () -> Unit) {
     var nombre by remember { mutableStateOf("") }
     var dosis by remember { mutableStateOf("") }
-    var intervalo by remember { mutableStateOf("") }
-    var hora by remember { mutableStateOf("") }
-    var repetir by remember { mutableStateOf(true) }
+    var horas by remember { mutableStateOf("") }
+    var horaIni by remember { mutableStateOf("") }
+    var diario by remember { mutableStateOf(true) }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState())) {
-        Text("Registrar Medicamento", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Text("Nuevo Medicamento", fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(20.dp))
         
-        TextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre del medicamento") }, modifier = Modifier.fillMaxWidth())
+        TextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(12.dp))
-        TextField(value = dosis, onValueChange = { dosis = it }, label = { Text("Cantidad / Dosis") }, modifier = Modifier.fillMaxWidth())
+        TextField(value = dosis, onValueChange = { dosis = it }, label = { Text("Dosis") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(12.dp))
-        TextField(
-            value = intervalo, 
-            onValueChange = { if (it.all { c -> c.isDigit() }) intervalo = it }, 
-            label = { Text("Cada cuántas horas") }, 
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
-            modifier = Modifier.fillMaxWidth()
-        )
+        TextField(value = horas, onValueChange = { horas = it }, label = { Text("Intervalo (horas)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(12.dp))
-        TextField(value = hora, onValueChange = { hora = it }, label = { Text("Hora inicio (Ej: 08:00)") }, modifier = Modifier.fillMaxWidth())
+        TextField(value = horaIni, onValueChange = { horaIni = it }, label = { Text("Hora inicio (HH:mm)") }, modifier = Modifier.fillMaxWidth())
         
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 12.dp)) {
-            Checkbox(checked = repetir, onCheckedChange = { repetir = it })
-            Text("Repetir diariamente", fontSize = 18.sp)
+            Checkbox(checked = diario, onCheckedChange = { diario = it })
+            Text("Repetir diario", fontSize = 18.sp)
         }
 
         Button(
             onClick = {
                 try {
-                    val t = LocalTime.parse(hora)
-                    Repository.agregarMedicamento(Medicamento(nombre, dosis, intervalo.toIntOrNull() ?: 0, t, repetir))
+                    val time = LocalTime.parse(horaIni)
+                    Repository.agregarMedicamento(Medicamento(nombre, dosis, horas.toIntOrNull() ?: 0, time, diario))
                     onSaved()
-                } catch (e: Exception) {
-                    // Manejo simple de error en formato
-                }
+                } catch (e: Exception) {}
             },
             modifier = Modifier.fillMaxWidth().height(60.dp)
         ) {
-            Text("Guardar Medicamento", fontSize = 18.sp)
+            Text("Guardar", fontSize = 20.sp)
         }
         
         if (Repository.medicamentos.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(32.dp))
-            Text("Medicamentos ingresados:", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(24.dp))
+            Text("Lista actual:", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Repository.medicamentos.forEach {
-                Text("• ${it.nombre} - ${it.dosis}", fontSize = 16.sp, modifier = Modifier.padding(vertical = 2.dp))
+                Text("• ${it.nombre} - ${it.dosis}", fontSize = 16.sp)
             }
         }
     }
