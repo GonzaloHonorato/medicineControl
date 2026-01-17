@@ -206,13 +206,15 @@ fun HomeView(onAddMedication: () -> Unit) {
             val next = sortedMeds.first()
             val remaining = sortedMeds.drop(1)
 
-            Text("Próximo ahora:", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text("Próximo medicamento:", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Spacer(modifier = Modifier.height(8.dp))
             MedicationCard(next, now, true)
             
             if (remaining.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 Text("Siguientes tomas:", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
                     items(remaining) { med ->
                         MedicationCard(med, now, false)
                     }
@@ -241,17 +243,24 @@ fun MedicationCard(med: Medicamento, now: LocalTime, isNext: Boolean) {
         "Faltan %02d:%02d:%02d".format(h, m, s)
     }
 
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = if (isNext) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer) 
-                 else CardDefaults.cardColors()
+        colors = if (isNext) CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ) else CardDefaults.elevatedCardColors()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(med.nombre, fontSize = if (isNext) 26.sp else 22.sp, fontWeight = FontWeight.Bold)
-            Text("Dosis: ${med.dosis}", fontSize = 18.sp)
-            Text("Hora: ${med.horaInicial.format(DateTimeFormatter.ofPattern("HH:mm"))}", fontSize = 18.sp)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(timeStr, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(med.nombre, fontSize = if (isNext) 28.sp else 22.sp, fontWeight = FontWeight.Bold)
+            Text("Cantidad: ${med.dosis}", fontSize = 18.sp)
+            Text("Hora programada: ${med.horaInicial.format(DateTimeFormatter.ofPattern("HH:mm"))}", fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = timeStr,
+                fontSize = if (isNext) 26.sp else 20.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+            )
         }
     }
 }
@@ -334,9 +343,12 @@ fun MedicationFormView(onSaved: () -> Unit) {
         
         if (Repository.medicamentos.isNotEmpty()) {
             Spacer(modifier = Modifier.height(32.dp))
-            Text("Resumen de ingresos:", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Medicamentos ingresados:", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(8.dp))
             Repository.medicamentos.forEach {
-                Text("• ${it.nombre} (${it.dosis}) cada ${it.intervaloHoras}h", fontSize = 16.sp)
+                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Text("• ${it.nombre} (${it.dosis}) cada ${it.intervaloHoras}h", fontSize = 16.sp, modifier = Modifier.padding(12.dp))
+                }
             }
         }
     }
