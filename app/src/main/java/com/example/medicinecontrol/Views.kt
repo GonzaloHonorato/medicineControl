@@ -24,11 +24,14 @@ import java.time.Duration
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
+val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$".toRegex()
+
 @Composable
 fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateToRecover: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf("") }
+    var emailError by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -44,7 +47,21 @@ fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateT
         Text("MedicineControl", fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(40.dp))
         
-        TextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
+        TextField(
+            value = email, 
+            onValueChange = { 
+                email = it 
+                emailError = false
+            }, 
+            label = { Text("Email") }, 
+            isError = emailError,
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+        )
+        if (emailError) {
+            Text("Email no válido", color = Color.Red, fontSize = 12.sp, modifier = Modifier.align(Alignment.Start))
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
         TextField(
             value = password, 
@@ -61,8 +78,13 @@ fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateT
         Spacer(modifier = Modifier.height(32.dp))
         Button(
             onClick = {
-                val user = Repository.usuarios.find { it.email == email && it.contrasena == password }
-                if (user != null) onLogin() else errorMsg = "Usuario o clave incorrecta"
+                val cleanEmail = email.trim()
+                if (cleanEmail.matches(emailRegex)) {
+                    val user = Repository.usuarios.find { it.email == cleanEmail && it.contrasena == password }
+                    if (user != null) onLogin() else errorMsg = "Usuario o clave incorrecta"
+                } else {
+                    emailError = true
+                }
             },
             modifier = Modifier.fillMaxWidth().height(60.dp)
         ) {
@@ -83,6 +105,7 @@ fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateT
                 if (demoUser != null) {
                     email = demoUser.email
                     password = demoUser.contrasena
+                    emailError = false
                 }
             },
             modifier = Modifier.fillMaxWidth()
@@ -102,15 +125,30 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
     var largeText by remember { mutableStateOf(false) }
     var recordatorio by remember { mutableStateOf("Visual") }
     var menuOpen by remember { mutableStateOf(false) }
+    
+    var nombreError by remember { mutableStateOf(false) }
     var emailError by remember { mutableStateOf(false) }
-
-    val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$".toRegex()
+    var passError by remember { mutableStateOf(false) }
+    var confirmError by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState())) {
         Text("Registro", fontSize = 30.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(24.dp))
 
-        TextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth())
+        TextField(
+            value = nombre, 
+            onValueChange = { 
+                nombre = it 
+                nombreError = false
+            }, 
+            label = { Text("Nombre") }, 
+            isError = nombreError,
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (nombreError) {
+            Text("El nombre es obligatorio", color = Color.Red, fontSize = 12.sp)
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
         TextField(
             value = email, 
@@ -124,12 +162,40 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
         )
         if (emailError) {
-            Text("Email no válido", color = Color.Red, fontSize = 12.sp)
+            Text("Email no válido u obligatorio", color = Color.Red, fontSize = 12.sp)
         }
+
         Spacer(modifier = Modifier.height(12.dp))
-        TextField(value = pass, onValueChange = { pass = it }, label = { Text("Contraseña") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        TextField(
+            value = pass, 
+            onValueChange = { 
+                pass = it 
+                passError = false
+            }, 
+            label = { Text("Contraseña") }, 
+            isError = passError,
+            visualTransformation = PasswordVisualTransformation(), 
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (passError) {
+            Text("La contraseña es obligatoria", color = Color.Red, fontSize = 12.sp)
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
-        TextField(value = confirm, onValueChange = { confirm = it }, label = { Text("Confirmar") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        TextField(
+            value = confirm, 
+            onValueChange = { 
+                confirm = it 
+                confirmError = false
+            }, 
+            label = { Text("Confirmar") }, 
+            isError = confirmError,
+            visualTransformation = PasswordVisualTransformation(), 
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (confirmError) {
+            Text("Debe confirmar la contraseña", color = Color.Red, fontSize = 12.sp)
+        }
         
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
             Checkbox(checked = accept, onCheckedChange = { accept = it })
@@ -160,13 +226,20 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
         Spacer(modifier = Modifier.height(32.dp))
         Button(
             onClick = {
-                val isEmailValid = email.matches(emailRegex)
-                if (pass == confirm && accept && nombre.isNotBlank() && isEmailValid) {
-                    if (Repository.agregarUsuario(User(nombre, email, pass, largeText, recordatorio == "Visual"))) {
+                val cleanEmail = email.trim()
+                val isEmailValid = cleanEmail.matches(emailRegex)
+                val isValid = nombre.isNotBlank() && cleanEmail.isNotBlank() && isEmailValid && 
+                              pass.isNotBlank() && confirm.isNotBlank() && pass == confirm && accept
+
+                if (isValid) {
+                    if (Repository.agregarUsuario(User(nombre, cleanEmail, pass, largeText, recordatorio == "Visual"))) {
                         onRegistered()
                     }
                 } else {
-                    if (!isEmailValid) emailError = true
+                    if (nombre.isBlank()) nombreError = true
+                    if (cleanEmail.isBlank() || !isEmailValid) emailError = true
+                    if (pass.isBlank()) passError = true
+                    if (confirm.isBlank()) confirmError = true
                 }
             },
             modifier = Modifier.fillMaxWidth().height(60.dp)
@@ -189,8 +262,6 @@ fun RecoverPasswordView(onBack: () -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var isError by remember { mutableStateOf(false) }
-
-    val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$".toRegex()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -223,9 +294,10 @@ fun RecoverPasswordView(onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(32.dp))
             Button(
                 onClick = {
-                    if (email.matches(emailRegex)) {
+                    val cleanEmail = email.trim()
+                    if (cleanEmail.matches(emailRegex)) {
                         scope.launch {
-                            snackbarHostState.showSnackbar("Instrucciones enviadas a $email")
+                            snackbarHostState.showSnackbar("Instrucciones enviadas a $cleanEmail")
                         }
                     } else {
                         isError = true
@@ -358,10 +430,13 @@ fun calculateDurationUntilNext(med: Medicamento, now: LocalTime): Duration {
 fun MedicationFormView(onSaved: () -> Unit) {
     var nombre by remember { mutableStateOf("") }
     var dosis by remember { mutableStateOf("") }
-    var intervaloSelected by remember { mutableStateOf(8) }
+    var intervaloSelected by remember { mutableIntStateOf(8) }
     var selectedTime by remember { mutableStateOf(LocalTime.now().withSecond(0).withNano(0)) }
     var showTimePicker by remember { mutableStateOf(false) }
     var diario by remember { mutableStateOf(true) }
+    
+    var nombreError by remember { mutableStateOf(false) }
+    var dosisError by remember { mutableStateOf(false) }
 
     val timeState = rememberTimePickerState(
         initialHour = selectedTime.hour,
@@ -386,9 +461,34 @@ fun MedicationFormView(onSaved: () -> Unit) {
         Text("Nuevo Medicamento", fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(20.dp))
         
-        TextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth())
+        TextField(
+            value = nombre, 
+            onValueChange = { 
+                nombre = it 
+                nombreError = false
+            }, 
+            label = { Text("Nombre") }, 
+            isError = nombreError,
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (nombreError) {
+            Text("El nombre es obligatorio", color = Color.Red, fontSize = 12.sp)
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
-        TextField(value = dosis, onValueChange = { dosis = it }, label = { Text("Dosis") }, modifier = Modifier.fillMaxWidth())
+        TextField(
+            value = dosis, 
+            onValueChange = { 
+                dosis = it 
+                dosisError = false
+            }, 
+            label = { Text("Dosis") }, 
+            isError = dosisError,
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (dosisError) {
+            Text("La dosis es obligatoria", color = Color.Red, fontSize = 12.sp)
+        }
         
         Spacer(modifier = Modifier.height(20.dp))
         Text("Intervalo de tomas (horas):", fontWeight = FontWeight.Bold)
@@ -419,9 +519,12 @@ fun MedicationFormView(onSaved: () -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
         Button(
             onClick = {
-                if (nombre.isNotBlank()) {
+                if (nombre.isNotBlank() && dosis.isNotBlank()) {
                     Repository.agregarMedicamento(Medicamento(nombre, dosis, intervaloSelected, selectedTime, diario))
                     onSaved()
+                } else {
+                    if (nombre.isBlank()) nombreError = true
+                    if (dosis.isBlank()) dosisError = true
                 }
             },
             modifier = Modifier.fillMaxWidth().height(60.dp)

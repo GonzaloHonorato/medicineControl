@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToRecover = { screen = "recover" }
                             )
                             "register" -> RegisterView(
-                                onRegistered = { screen = "login" },
+                                onRegistered = { screen = "home" },
                                 onNavigateToLogin = { screen = "login" }
                             )
                             "recover" -> RecoverPasswordView(

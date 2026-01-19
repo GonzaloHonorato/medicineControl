@@ -4,17 +4,18 @@ import androidx.compose.runtime.mutableStateListOf
 
 object Repository {
     val usuarios = mutableStateListOf<User>(
-        User("Usuario 1", "test@test.com", "123456")
+        User("Usuario 1", "test1@test.com", "123456"),
+        User("Usuario 2", "test2@test.com", "123456"),
+        User("Usuario 3", "test3@test.com", "123456"),
+        User("Usuario 4", "test4@test.com", "123456"),
+        User("Usuario 5", "test5@test.com", "123456")
     )
     
     val medicamentos = mutableStateListOf<Medicamento>()
 
     fun agregarUsuario(user: User): Boolean {
-        if (usuarios.size < 5) {
-            usuarios.add(user)
-            return true
-        }
-        return false
+        usuarios.add(user)
+        return true
     }
 
     fun agregarMedicamento(med: Medicamento) {
