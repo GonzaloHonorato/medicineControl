@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -101,6 +102,9 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
     var largeText by remember { mutableStateOf(false) }
     var recordatorio by remember { mutableStateOf("Visual") }
     var menuOpen by remember { mutableStateOf(false) }
+    var emailError by remember { mutableStateOf(false) }
+
+    val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$".toRegex()
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState())) {
         Text("Registro", fontSize = 30.sp, fontWeight = FontWeight.Bold)
@@ -108,7 +112,20 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
 
         TextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(12.dp))
-        TextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
+        TextField(
+            value = email, 
+            onValueChange = { 
+                email = it 
+                emailError = false
+            }, 
+            label = { Text("Email") },
+            isError = emailError,
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+        )
+        if (emailError) {
+            Text("Email no válido", color = Color.Red, fontSize = 12.sp)
+        }
         Spacer(modifier = Modifier.height(12.dp))
         TextField(value = pass, onValueChange = { pass = it }, label = { Text("Contraseña") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(12.dp))
@@ -143,10 +160,13 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
         Spacer(modifier = Modifier.height(32.dp))
         Button(
             onClick = {
-                if (pass == confirm && accept && nombre.isNotBlank()) {
+                val isEmailValid = email.matches(emailRegex)
+                if (pass == confirm && accept && nombre.isNotBlank() && isEmailValid) {
                     if (Repository.agregarUsuario(User(nombre, email, pass, largeText, recordatorio == "Visual"))) {
                         onRegistered()
                     }
+                } else {
+                    if (!isEmailValid) emailError = true
                 }
             },
             modifier = Modifier.fillMaxWidth().height(60.dp)
@@ -166,26 +186,64 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
 @Composable
 fun RecoverPasswordView(onBack: () -> Unit) {
     var email by remember { mutableStateOf("") }
-    var enviado by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var isError by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
-        Text("Recuperar acceso", fontSize = 28.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(16.dp))
-        TextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("Se enviará un enlace de recuperación a su correo.", fontSize = 16.sp)
-        
-        if (enviado) {
-            Text("Enviado correctamente.", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
+    val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$".toRegex()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp), 
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Recuperar acceso", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            TextField(
+                value = email, 
+                onValueChange = { 
+                    email = it 
+                    isError = false
+                }, 
+                label = { Text("Email") },
+                isError = isError,
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+            )
+            
+            if (isError) {
+                Text("Email no válido", color = Color.Red, fontSize = 12.sp, modifier = Modifier.align(Alignment.Start))
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Se enviará un enlace de recuperación a su correo.", fontSize = 16.sp)
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            Button(
+                onClick = {
+                    if (email.matches(emailRegex)) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Instrucciones enviadas a $email")
+                        }
+                    } else {
+                        isError = true
+                    }
+                }, 
+                modifier = Modifier.fillMaxWidth().height(56.dp)
+            ) {
+                Text("Enviar instrucciones")
+            }
+            TextButton(onClick = onBack) {
+                Text("Volver", fontSize = 16.sp)
+            }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
-        Button(onClick = { enviado = true }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-            Text("Enviar instrucciones")
-        }
-        TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-            Text("Volver", fontSize = 16.sp)
-        }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 
