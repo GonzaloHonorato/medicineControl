@@ -10,6 +10,13 @@ data class User(
     val recordatorioVisual: Boolean = true
 )
 
+// Catálogo de medicamentos guardados
+data class MedicamentoCatalogo(
+    val nombre: String,
+    val dosis: String
+)
+
+// Medicamento programado con horarios
 data class Medicamento(
     val nombre: String,
     val dosis: String,

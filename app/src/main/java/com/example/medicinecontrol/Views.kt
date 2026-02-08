@@ -427,14 +427,15 @@ fun calculateDurationUntilNext(med: Medicamento, now: LocalTime): Duration {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MedicationFormView(onSaved: () -> Unit) {
+fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
     var nombre by remember { mutableStateOf("") }
     var dosis by remember { mutableStateOf("") }
     var intervaloSelected by remember { mutableIntStateOf(8) }
     var selectedTime by remember { mutableStateOf(LocalTime.now().withSecond(0).withNano(0)) }
     var showTimePicker by remember { mutableStateOf(false) }
     var diario by remember { mutableStateOf(true) }
-    
+    var showCatalogMenu by remember { mutableStateOf(false) }
+
     var nombreError by remember { mutableStateOf(false) }
     var dosisError by remember { mutableStateOf(false) }
 
@@ -458,16 +459,45 @@ fun MedicationFormView(onSaved: () -> Unit) {
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState())) {
-        Text("Nuevo Medicamento", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Text("Programar Medicamento", fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(20.dp))
-        
+
+        if (Repository.catalogo.isNotEmpty()) {
+            Box {
+                OutlinedButton(
+                    onClick = { showCatalogMenu = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Seleccionar de mis medicamentos")
+                }
+                DropdownMenu(
+                    expanded = showCatalogMenu,
+                    onDismissRequest = { showCatalogMenu = false }
+                ) {
+                    Repository.catalogo.forEach { med ->
+                        DropdownMenuItem(
+                            text = { Text("${med.nombre} - ${med.dosis}") },
+                            onClick = {
+                                nombre = med.nombre
+                                dosis = med.dosis
+                                showCatalogMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("O escribir manualmente:", fontSize = 14.sp, color = Color.Gray)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         TextField(
-            value = nombre, 
-            onValueChange = { 
-                nombre = it 
+            value = nombre,
+            onValueChange = {
+                nombre = it
                 nombreError = false
-            }, 
-            label = { Text("Nombre") }, 
+            },
+            label = { Text("Nombre") },
             isError = nombreError,
             modifier = Modifier.fillMaxWidth()
         )
@@ -531,7 +561,14 @@ fun MedicationFormView(onSaved: () -> Unit) {
         ) {
             Text("Guardar Medicamento", fontSize = 20.sp)
         }
-        
+
+        OutlinedButton(
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth().height(56.dp)
+        ) {
+            Text("Cancelar", fontSize = 18.sp)
+        }
+
         if (Repository.medicamentos.isNotEmpty()) {
             Spacer(modifier = Modifier.height(32.dp))
             Text("Medicamentos ingresados:", fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -541,6 +578,95 @@ fun MedicationFormView(onSaved: () -> Unit) {
                     Text("• ${it.nombre} (${it.dosis}) cada ${it.intervaloHoras}h", fontSize = 16.sp, modifier = Modifier.padding(12.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
+    var showDialog by remember { mutableStateOf(false) }
+    var nombre by remember { mutableStateOf("") }
+    var dosis by remember { mutableStateOf("") }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("Nuevo Medicamento") },
+            text = {
+                Column {
+                    TextField(
+                        value = nombre,
+                        onValueChange = { nombre = it },
+                        label = { Text("Nombre") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextField(
+                        value = dosis,
+                        onValueChange = { dosis = it },
+                        label = { Text("Dosis") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (nombre.isNotBlank() && dosis.isNotBlank()) {
+                        Repository.agregarAlCatalogo(MedicamentoCatalogo(nombre, dosis))
+                        nombre = ""
+                        dosis = ""
+                        showDialog = false
+                    }
+                }) {
+                    Text("Guardar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Mis Medicamentos", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+            TextButton(onClick = onNavigateToHome) {
+                Text("Volver al inicio", fontSize = 16.sp)
+            }
+        }
+        Spacer(modifier = Modifier.height(20.dp))
+
+        if (Repository.catalogo.isEmpty()) {
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Text("No hay medicamentos guardados", fontSize = 18.sp, color = Color.Gray)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(Repository.catalogo) { med ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(med.nombre, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            Text("Dosis: ${med.dosis}", fontSize = 16.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        Button(
+            onClick = { showDialog = true },
+            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp).height(64.dp)
+        ) {
+            Text("Agregar medicamento", fontSize = 22.sp)
         }
     }
 }
