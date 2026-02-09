@@ -370,7 +370,7 @@ fun HomeView(onAddMedication: () -> Unit) {
             onClick = onAddMedication,
             modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp).height(64.dp)
         ) {
-            Text("Agregar medicamento", fontSize = 22.sp)
+            Text("Programar medicamento", fontSize = 22.sp)
         }
     }
 }
@@ -466,9 +466,9 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
             Box {
                 OutlinedButton(
                     onClick = { showCatalogMenu = true },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().height(60.dp)
                 ) {
-                    Text("Seleccionar de mis medicamentos")
+                    Text("Seleccionar de mis medicamentos", fontSize = 18.sp)
                 }
                 DropdownMenu(
                     expanded = showCatalogMenu,
@@ -476,7 +476,7 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
                 ) {
                     Repository.catalogo.forEach { med ->
                         DropdownMenuItem(
-                            text = { Text("${med.nombre} - ${med.dosis}") },
+                            text = { Text("${med.nombre} - ${med.dosis}", fontSize = 16.sp) },
                             onClick = {
                                 nombre = med.nombre
                                 dosis = med.dosis
@@ -486,67 +486,82 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("O escribir manualmente:", fontSize = 14.sp, color = Color.Gray)
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+            Text("O escribir manualmente:", fontSize = 16.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
-        TextField(
+        OutlinedTextField(
             value = nombre,
             onValueChange = {
                 nombre = it
                 nombreError = false
             },
-            label = { Text("Nombre") },
+            label = { Text("Nombre", fontSize = 18.sp) },
             isError = nombreError,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().height(70.dp),
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp)
         )
         if (nombreError) {
-            Text("El nombre es obligatorio", color = Color.Red, fontSize = 12.sp)
+            Text("El nombre es obligatorio", color = Color.Red, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp))
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-        TextField(
-            value = dosis, 
-            onValueChange = { 
-                dosis = it 
+        Spacer(modifier = Modifier.height(16.dp))
+        OutlinedTextField(
+            value = dosis,
+            onValueChange = {
+                dosis = it
                 dosisError = false
-            }, 
-            label = { Text("Dosis") }, 
+            },
+            label = { Text("Dosis", fontSize = 18.sp) },
             isError = dosisError,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().height(70.dp),
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp)
         )
         if (dosisError) {
-            Text("La dosis es obligatoria", color = Color.Red, fontSize = 12.sp)
+            Text("La dosis es obligatoria", color = Color.Red, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp))
         }
         
         Spacer(modifier = Modifier.height(20.dp))
-        Text("Intervalo de tomas (horas):", fontWeight = FontWeight.Bold)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        Text("Intervalo de tomas (horas):", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
             listOf(4, 6, 8, 12, 24).forEach { hours ->
                 FilterChip(
                     selected = intervaloSelected == hours,
                     onClick = { intervaloSelected = hours },
-                    label = { Text("${hours}h") }
+                    label = { Text("${hours}h", fontSize = 16.sp, fontWeight = FontWeight.Medium) },
+                    modifier = Modifier.height(48.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-        Text("Hora de la primera toma:", fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Hora de la primera toma:", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Spacer(modifier = Modifier.height(8.dp))
         OutlinedButton(
             onClick = { showTimePicker = true },
-            modifier = Modifier.fillMaxWidth().height(56.dp)
+            modifier = Modifier.fillMaxWidth().height(64.dp)
         ) {
-            Text(selectedTime.format(DateTimeFormatter.ofPattern("HH:mm")), fontSize = 18.sp)
+            Text(selectedTime.format(DateTimeFormatter.ofPattern("HH:mm")), fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
         
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 12.dp)) {
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
             Checkbox(checked = diario, onCheckedChange = { diario = it })
-            Text("Repetir diariamente", fontSize = 18.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Repetir diariamente", fontSize = 18.sp, fontWeight = FontWeight.Medium)
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         Button(
             onClick = {
                 if (nombre.isNotBlank() && dosis.isNotBlank()) {
@@ -557,14 +572,15 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
                     if (dosis.isBlank()) dosisError = true
                 }
             },
-            modifier = Modifier.fillMaxWidth().height(60.dp)
+            modifier = Modifier.fillMaxWidth().height(64.dp)
         ) {
-            Text("Guardar Medicamento", fontSize = 20.sp)
+            Text("Guardar Medicamento", fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
 
+        Spacer(modifier = Modifier.height(12.dp))
         OutlinedButton(
             onClick = onBack,
-            modifier = Modifier.fillMaxWidth().height(56.dp)
+            modifier = Modifier.fillMaxWidth().height(60.dp)
         ) {
             Text("Cancelar", fontSize = 18.sp)
         }
@@ -591,21 +607,23 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text("Nuevo Medicamento") },
+            title = { Text("Nuevo Medicamento", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    TextField(
+                    OutlinedTextField(
                         value = nombre,
                         onValueChange = { nombre = it },
-                        label = { Text("Nombre") },
-                        modifier = Modifier.fillMaxWidth()
+                        label = { Text("Nombre", fontSize = 16.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextField(
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
                         value = dosis,
                         onValueChange = { dosis = it },
-                        label = { Text("Dosis") },
-                        modifier = Modifier.fillMaxWidth()
+                        label = { Text("Dosis", fontSize = 16.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
                     )
                 }
             },
@@ -618,28 +636,19 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
                         showDialog = false
                     }
                 }) {
-                    Text("Guardar")
+                    Text("Guardar", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDialog = false }) {
-                    Text("Cancelar")
+                    Text("Cancelar", fontSize = 16.sp)
                 }
             }
         )
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Mis Medicamentos", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
-            TextButton(onClick = onNavigateToHome) {
-                Text("Volver al inicio", fontSize = 16.sp)
-            }
-        }
+        Text("Mis Medicamentos", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(modifier = Modifier.height(20.dp))
 
         if (Repository.catalogo.isEmpty()) {
@@ -662,11 +671,20 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
             }
         }
 
+        Spacer(modifier = Modifier.height(8.dp))
         Button(
             onClick = { showDialog = true },
-            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp).height(64.dp)
+            modifier = Modifier.fillMaxWidth().height(64.dp)
         ) {
-            Text("Agregar medicamento", fontSize = 22.sp)
+            Text("Agregar medicamento", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = onNavigateToHome,
+            modifier = Modifier.fillMaxWidth().height(60.dp)
+        ) {
+            Text("Volver al inicio", fontSize = 18.sp)
         }
     }
 }
