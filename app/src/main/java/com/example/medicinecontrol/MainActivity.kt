@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -27,7 +28,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
-                        if (screen == "home" || screen == "my_meds") {
+                        if (screen == "home" || screen == "my_meds" || screen == "my_account") {
                             NavigationBar {
                                 NavigationBarItem(
                                     icon = { Icon(Icons.Filled.Home, contentDescription = "Inicio") },
@@ -40,11 +41,20 @@ class MainActivity : ComponentActivity() {
                                 )
                                 NavigationBarItem(
                                     icon = { Icon(Icons.Filled.List, contentDescription = "Mis Medicamentos") },
-                                    label = { Text("Mis Medicamentos") },
+                                    label = { Text("Medicamentos") },
                                     selected = selectedTab == 1,
                                     onClick = {
                                         selectedTab = 1
                                         screen = "my_meds"
+                                    }
+                                )
+                                NavigationBarItem(
+                                    icon = { Icon(Icons.Filled.Person, contentDescription = "Mi Cuenta") },
+                                    label = { Text("Cuenta") },
+                                    selected = selectedTab == 2,
+                                    onClick = {
+                                        selectedTab = 2
+                                        screen = "my_account"
                                     }
                                 )
                             }
@@ -77,6 +87,12 @@ class MainActivity : ComponentActivity() {
                             "my_meds" -> MyMedicinesView(
                                 onNavigateToHome = {
                                     screen = "home"
+                                    selectedTab = 0
+                                }
+                            )
+                            "my_account" -> MyAccountView(
+                                onLogout = {
+                                    screen = "login"
                                     selectedTab = 0
                                 }
                             )

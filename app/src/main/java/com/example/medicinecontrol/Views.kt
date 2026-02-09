@@ -81,7 +81,12 @@ fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateT
                 val cleanEmail = email.trim()
                 if (cleanEmail.matches(emailRegex)) {
                     val user = Repository.usuarios.find { it.email == cleanEmail && it.contrasena == password }
-                    if (user != null) onLogin() else errorMsg = "Usuario o clave incorrecta"
+                    if (user != null) {
+                        Repository.iniciarSesion(user)
+                        onLogin()
+                    } else {
+                        errorMsg = "Usuario o clave incorrecta"
+                    }
                 } else {
                     emailError = true
                 }
@@ -232,7 +237,9 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
                               pass.isNotBlank() && confirm.isNotBlank() && pass == confirm && accept
 
                 if (isValid) {
-                    if (Repository.agregarUsuario(User(nombre, cleanEmail, pass, largeText, recordatorio == "Visual"))) {
+                    val nuevoUsuario = User(nombre, cleanEmail, pass, largeText, recordatorio == "Visual")
+                    if (Repository.agregarUsuario(nuevoUsuario)) {
+                        Repository.iniciarSesion(nuevoUsuario)
                         onRegistered()
                     }
                 } else {
@@ -341,8 +348,17 @@ fun HomeView(onAddMedication: () -> Unit) {
         Spacer(modifier = Modifier.height(20.dp))
         
         if (sortedMeds.isEmpty()) {
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Text("No hay registros", fontSize = 18.sp, color = Color.Gray)
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No hay medicamentos programados",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
             }
         } else {
             val next = sortedMeds.first()
@@ -652,8 +668,17 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
         Spacer(modifier = Modifier.height(20.dp))
 
         if (Repository.catalogo.isEmpty()) {
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Text("No hay medicamentos guardados", fontSize = 18.sp, color = Color.Gray)
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No hay medicamentos guardados",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
             }
         } else {
             LazyColumn(
@@ -685,6 +710,68 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
             modifier = Modifier.fillMaxWidth().height(60.dp)
         ) {
             Text("Volver al inicio", fontSize = 18.sp)
+        }
+    }
+}
+
+@Composable
+fun MyAccountView(onLogout: () -> Unit) {
+    val usuario = Repository.usuarioActual
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Mi Cuenta", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+        Spacer(modifier = Modifier.height(40.dp))
+
+        if (usuario != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Column(modifier = Modifier.padding(24.dp)) {
+                    Text("Nombre", fontSize = 14.sp, color = Color.Gray)
+                    Text(usuario.nombre, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Email", fontSize = 14.sp, color = Color.Gray)
+                    Text(usuario.email, fontSize = 18.sp)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Accesibilidad", fontSize = 14.sp, color = Color.Gray)
+                    Text(
+                        if (usuario.accesibilidadGrande) "Texto grande" else "Texto normal",
+                        fontSize = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Recordatorio", fontSize = 14.sp, color = Color.Gray)
+                    Text(
+                        if (usuario.recordatorioVisual) "Visual" else "Visual + Sonido",
+                        fontSize = 18.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Button(
+                onClick = {
+                    Repository.cerrarSesion()
+                    onLogout()
+                },
+                modifier = Modifier.fillMaxWidth().height(64.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("Cerrar sesión", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+        } else {
+            Text("No hay usuario logueado", fontSize = 18.sp, color = Color.Gray)
         }
     }
 }

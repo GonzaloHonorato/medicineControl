@@ -11,6 +11,9 @@ object Repository {
         User("Usuario 5", "test5@test.com", "123456")
     )
 
+    // Usuario actualmente logueado
+    var usuarioActual: User? = null
+
     // Catálogo de medicamentos guardados
     val catalogo = mutableStateListOf<MedicamentoCatalogo>()
 
@@ -20,6 +23,16 @@ object Repository {
     fun agregarUsuario(user: User): Boolean {
         usuarios.add(user)
         return true
+    }
+
+    fun iniciarSesion(user: User) {
+        usuarioActual = user
+    }
+
+    fun cerrarSesion() {
+        usuarioActual = null
+        catalogo.clear()
+        medicamentos.clear()
     }
 
     fun agregarAlCatalogo(med: MedicamentoCatalogo) {
