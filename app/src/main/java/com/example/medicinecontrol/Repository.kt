@@ -42,4 +42,11 @@ object Repository {
     fun agregarMedicamento(med: Medicamento) {
         medicamentos.add(med)
     }
+
+    fun marcarComoTomado(med: Medicamento) {
+        val index = medicamentos.indexOf(med)
+        if (index != -1) {
+            medicamentos[index] = med.copy(ultimaToma = java.time.LocalDateTime.now())
+        }
+    }
 }

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -28,7 +29,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
-                        if (screen == "home" || screen == "my_meds" || screen == "my_account") {
+                        if (screen == "home" || screen == "my_meds" || screen == "historial" || screen == "my_account") {
                             NavigationBar {
                                 NavigationBarItem(
                                     icon = { Icon(Icons.Filled.Home, contentDescription = "Inicio") },
@@ -49,11 +50,20 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                                 NavigationBarItem(
-                                    icon = { Icon(Icons.Filled.Person, contentDescription = "Mi Cuenta") },
-                                    label = { Text("Cuenta") },
+                                    icon = { Icon(Icons.Filled.History, contentDescription = "Historial") },
+                                    label = { Text("Historial") },
                                     selected = selectedTab == 2,
                                     onClick = {
                                         selectedTab = 2
+                                        screen = "historial"
+                                    }
+                                )
+                                NavigationBarItem(
+                                    icon = { Icon(Icons.Filled.Person, contentDescription = "Mi Cuenta") },
+                                    label = { Text("Cuenta") },
+                                    selected = selectedTab == 3,
+                                    onClick = {
+                                        selectedTab = 3
                                         screen = "my_account"
                                     }
                                 )
@@ -90,6 +100,7 @@ class MainActivity : ComponentActivity() {
                                     selectedTab = 0
                                 }
                             )
+                            "historial" -> HistorialView()
                             "my_account" -> MyAccountView(
                                 onLogout = {
                                     screen = "login"

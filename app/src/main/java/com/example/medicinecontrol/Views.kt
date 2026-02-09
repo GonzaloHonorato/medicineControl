@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Duration
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -330,6 +331,8 @@ fun RecoverPasswordView(onBack: () -> Unit) {
 fun HomeView(onAddMedication: () -> Unit) {
     val meds = Repository.medicamentos
     var now by remember { mutableStateOf(LocalTime.now()) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -343,7 +346,8 @@ fun HomeView(onAddMedication: () -> Unit) {
         calculateDurationUntilNext(med, now).toSeconds()
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Próximos medicamentos", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(modifier = Modifier.height(20.dp))
         
@@ -366,15 +370,53 @@ fun HomeView(onAddMedication: () -> Unit) {
 
             Text("Próximo medicamento:", fontWeight = FontWeight.Bold, fontSize = 20.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            MedicationCard(next, now, true)
-            
+            MedicationCard(
+                med = next,
+                now = now,
+                isNext = true,
+                onMarcarTomado = {
+                    val index = Repository.medicamentos.indexOf(next)
+                    if (index != -1) {
+                        val ahora = LocalDateTime.now()
+                        val nuevasTomasList = next.historialTomas.toMutableList()
+                        nuevasTomasList.add(ahora)
+                        Repository.medicamentos[index] = next.copy(
+                            ultimaToma = ahora,
+                            historialTomas = nuevasTomasList
+                        )
+                        scope.launch {
+                            snackbarHostState.showSnackbar("${next.nombre} marcado como tomado")
+                        }
+                    }
+                }
+            )
+
             if (remaining.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text("Siguientes tomas:", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
                     items(remaining) { med ->
-                        MedicationCard(med, now, false)
+                        MedicationCard(
+                            med = med,
+                            now = now,
+                            isNext = false,
+                            onMarcarTomado = {
+                                val index = Repository.medicamentos.indexOf(med)
+                                if (index != -1) {
+                                    val ahora = LocalDateTime.now()
+                                    val nuevasTomasList = med.historialTomas.toMutableList()
+                                    nuevasTomasList.add(ahora)
+                                    Repository.medicamentos[index] = med.copy(
+                                        ultimaToma = ahora,
+                                        historialTomas = nuevasTomasList
+                                    )
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar("${med.nombre} marcado como tomado")
+                                    }
+                                }
+                            }
+                        )
                     }
                 }
             } else {
@@ -382,63 +424,136 @@ fun HomeView(onAddMedication: () -> Unit) {
             }
         }
 
-        Button(
-            onClick = onAddMedication,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp).height(64.dp)
-        ) {
-            Text("Programar medicamento", fontSize = 22.sp)
+            Button(
+                onClick = onAddMedication,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp).height(64.dp)
+            ) {
+                Text("Programar medicamento", fontSize = 22.sp)
+            }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 
 @Composable
-fun MedicationCard(med: Medicamento, now: LocalTime, isNext: Boolean) {
+fun MedicationCard(med: Medicamento, now: LocalTime, isNext: Boolean, onMarcarTomado: () -> Unit) {
+    val ahora = LocalDateTime.now()
     val duration = calculateDurationUntilNext(med, now)
-    
-    val h = duration.toHours()
-    val m = duration.toMinutes() % 60
-    val s = duration.seconds % 60
-    val timeStr = if (duration.isZero || (duration.toSeconds() < 5)) "¡Ahora!" 
-                 else "Faltan %02d:%02d:%02d".format(h, m, s)
+    val atrasado = estaAtrasado(med, ahora)
+    val proximaToma = calcularProximaToma(med, ahora)
 
-    val nextDoseTime = now.plus(duration)
+    val h = duration.toHours().coerceAtLeast(0)
+    val m = duration.toMinutes().coerceAtLeast(0) % 60
+    val s = duration.seconds.coerceAtLeast(0) % 60
+
+    val timeStr = when {
+        atrasado -> "¡ATRASADO!"
+        duration.isZero || (duration.toSeconds() < 5) -> "¡Ahora!"
+        else -> "Faltan %02d:%02d:%02d".format(h, m, s)
+    }
+
+    val cardColor = when {
+        atrasado -> CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer
+        )
+        isNext -> CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+        else -> CardDefaults.elevatedCardColors()
+    }
 
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = if (isNext) CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ) else CardDefaults.elevatedCardColors()
+        colors = cardColor
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(med.nombre, fontSize = if (isNext) 28.sp else 22.sp, fontWeight = FontWeight.Bold)
             Text("Dosis: ${med.dosis}", fontSize = 18.sp)
-            Text("Próxima toma: ${nextDoseTime.format(DateTimeFormatter.ofPattern("HH:mm"))}", fontSize = 18.sp)
+            Text(
+                "Próxima toma: ${proximaToma.format(DateTimeFormatter.ofPattern("HH:mm"))}",
+                fontSize = 18.sp
+            )
+
+            if (atrasado) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Estado: ATRASADO",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = timeStr,
                 fontSize = if (isNext) 26.sp else 20.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                color = when {
+                    atrasado -> MaterialTheme.colorScheme.error
+                    isNext -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.secondary
+                }
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = onMarcarTomado,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (atrasado) MaterialTheme.colorScheme.error
+                                   else MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text("Marcar como tomado", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
 
 fun calculateDurationUntilNext(med: Medicamento, now: LocalTime): Duration {
-    val nowSec = now.toSecondOfDay()
-    val startSec = med.horaInicial.toSecondOfDay()
-    val intervalSec = med.intervaloHoras * 3600
-    
-    var diff = (startSec - nowSec).toLong()
-    if (intervalSec > 0) {
-        while (diff < 0) {
-            diff += intervalSec
+    val ahora = LocalDateTime.now()
+    val proximaToma = calcularProximaToma(med, ahora)
+
+    return Duration.between(ahora, proximaToma)
+}
+
+fun calcularProximaToma(med: Medicamento, ahora: LocalDateTime): LocalDateTime {
+    // Si nunca se ha tomado, usar la hora inicial de hoy
+    if (med.ultimaToma == null) {
+        val hoy = ahora.toLocalDate()
+        var proximaToma = LocalDateTime.of(hoy, med.horaInicial)
+
+        // Si ya pasó, calcular la siguiente
+        while (proximaToma.isBefore(ahora)) {
+            proximaToma = proximaToma.plusHours(med.intervaloHoras.toLong())
         }
-    } else {
-        if (diff < 0) diff += 86400
+        return proximaToma
     }
-    return Duration.ofSeconds(diff)
+
+    // Si ya se tomó, calcular desde la última toma
+    var proximaToma = med.ultimaToma!!.plusHours(med.intervaloHoras.toLong())
+
+    // Si ya pasó el tiempo, seguir sumando intervalos
+    while (proximaToma.isBefore(ahora)) {
+        proximaToma = proximaToma.plusHours(med.intervaloHoras.toLong())
+    }
+
+    return proximaToma
+}
+
+fun estaAtrasado(med: Medicamento, ahora: LocalDateTime): Boolean {
+    val proximaToma = calcularProximaToma(med, ahora)
+    val margenMinutos = 15 // 15 minutos de margen
+
+    // Está atrasado si la próxima toma ya pasó hace más del margen
+    return ahora.isAfter(proximaToma.plusMinutes(margenMinutos.toLong()))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -710,6 +825,66 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
             modifier = Modifier.fillMaxWidth().height(60.dp)
         ) {
             Text("Volver al inicio", fontSize = 18.sp)
+        }
+    }
+}
+
+@Composable
+fun HistorialView() {
+    val allTomas = Repository.medicamentos.flatMap { med ->
+        med.historialTomas.map { toma ->
+            Triple(med.nombre, med.dosis, toma)
+        }
+    }.sortedByDescending { it.third }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Text("Historial de Tomas", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+        Spacer(modifier = Modifier.height(20.dp))
+
+        if (allTomas.isEmpty()) {
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No hay tomas registradas",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(allTomas) { (nombre, dosis, toma) ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(nombre, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                                Text("Dosis: $dosis", fontSize = 16.sp)
+                                Text(
+                                    toma.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")),
+                                    fontSize = 14.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                            Icon(
+                                painter = painterResource(id = android.R.drawable.ic_menu_agenda),
+                                contentDescription = "Tomado",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

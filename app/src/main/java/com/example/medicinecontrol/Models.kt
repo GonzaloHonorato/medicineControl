@@ -1,5 +1,6 @@
 package com.example.medicinecontrol
 
+import java.time.LocalDateTime
 import java.time.LocalTime
 
 data class User(
@@ -22,5 +23,7 @@ data class Medicamento(
     val dosis: String,
     val intervaloHoras: Int,
     val horaInicial: LocalTime,
-    val repetirDiario: Boolean
+    val repetirDiario: Boolean,
+    var ultimaToma: LocalDateTime? = null,
+    val historialTomas: MutableList<LocalDateTime> = mutableListOf()
 )
