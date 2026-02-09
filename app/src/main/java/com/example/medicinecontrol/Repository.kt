@@ -44,9 +44,32 @@ object Repository {
     }
 
     fun marcarComoTomado(med: Medicamento) {
-        val index = medicamentos.indexOf(med)
-        if (index != -1) {
-            medicamentos[index] = med.copy(ultimaToma = java.time.LocalDateTime.now())
+        executeWithTryCatch(Unit) {
+            val index = medicamentos.indexOf(med)
+            if (index != -1) {
+                medicamentos[index] = med.copy(ultimaToma = java.time.LocalDateTime.now())
+            }
+        }
+    }
+
+    fun modificarMedicamento(med: Medicamento, transform: (Medicamento) -> Medicamento) {
+        executeWithTryCatch(Unit) {
+            val index = medicamentos.indexOf(med)
+            if (index != -1) {
+                medicamentos[index] = transform(medicamentos[index])
+            }
+        }
+    }
+
+    fun filtrarMedicamentos(predicate: (Medicamento) -> Boolean): List<Medicamento> {
+        return executeWithTryCatch(emptyList()) {
+            medicamentos.filter(predicate)
+        }
+    }
+
+    fun aplicarATodos(action: (Medicamento) -> Unit) {
+        executeWithTryCatch(Unit) {
+            medicamentos.forEach(action)
         }
     }
 }

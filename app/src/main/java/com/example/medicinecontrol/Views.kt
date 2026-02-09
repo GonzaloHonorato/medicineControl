@@ -25,7 +25,6 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$".toRegex()
 
 @Composable
 fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateToRecover: () -> Unit) {
@@ -80,13 +79,15 @@ fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateT
         Button(
             onClick = {
                 val cleanEmail = email.trim()
-                if (cleanEmail.matches(emailRegex)) {
-                    val user = Repository.usuarios.find { it.email == cleanEmail && it.contrasena == password }
-                    if (user != null) {
-                        Repository.iniciarSesion(user)
-                        onLogin()
-                    } else {
-                        errorMsg = "Usuario o clave incorrecta"
+                if (cleanEmail.isValidEmail()) {
+                    executeWithTryCatch(Unit) {
+                        val user = Repository.usuarios.find { it.email == cleanEmail && it.contrasena == password }
+                        if (user != null) {
+                            Repository.iniciarSesion(user)
+                            onLogin()
+                        } else {
+                            errorMsg = "Usuario o clave incorrecta"
+                        }
                     }
                 } else {
                     emailError = true
@@ -233,21 +234,25 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
         Button(
             onClick = {
                 val cleanEmail = email.trim()
-                val isEmailValid = cleanEmail.matches(emailRegex)
-                val isValid = nombre.isNotBlank() && cleanEmail.isNotBlank() && isEmailValid && 
-                              pass.isNotBlank() && confirm.isNotBlank() && pass == confirm && accept
+                val isEmailValid = cleanEmail.isValidEmail()
 
-                if (isValid) {
-                    val nuevoUsuario = User(nombre, cleanEmail, pass, largeText, recordatorio == "Visual")
-                    if (Repository.agregarUsuario(nuevoUsuario)) {
-                        Repository.iniciarSesion(nuevoUsuario)
-                        onRegistered()
+                val esValido = validarCampos(
+                    (nombre.isNotBlank()) to { nombreError = true },
+                    (cleanEmail.isNotBlank() && isEmailValid) to { emailError = true },
+                    (pass.isNotBlank()) to { passError = true },
+                    (confirm.isNotBlank()) to { confirmError = true },
+                    (pass == confirm) to { confirmError = true },
+                    (accept) to { }
+                )
+
+                if (esValido) {
+                    executeWithTryCatch(Unit) {
+                        val nuevoUsuario = User(nombre, cleanEmail, pass, largeText, recordatorio == "Visual")
+                        if (Repository.agregarUsuario(nuevoUsuario)) {
+                            Repository.iniciarSesion(nuevoUsuario)
+                            onRegistered()
+                        }
                     }
-                } else {
-                    if (nombre.isBlank()) nombreError = true
-                    if (cleanEmail.isBlank() || !isEmailValid) emailError = true
-                    if (pass.isBlank()) passError = true
-                    if (confirm.isBlank()) confirmError = true
                 }
             },
             modifier = Modifier.fillMaxWidth().height(60.dp)
@@ -303,14 +308,16 @@ fun RecoverPasswordView(onBack: () -> Unit) {
             Button(
                 onClick = {
                     val cleanEmail = email.trim()
-                    if (cleanEmail.matches(emailRegex)) {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Instrucciones enviadas a $cleanEmail")
+                    if (cleanEmail.isValidEmail()) {
+                        executeWithTryCatch(Unit) {
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Instrucciones enviadas a $cleanEmail")
+                            }
                         }
                     } else {
                         isError = true
                     }
-                }, 
+                },
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
                 Text("Enviar instrucciones")
@@ -342,9 +349,7 @@ fun HomeView(onAddMedication: () -> Unit) {
     }
 
     // Ordenar medicamentos por el tiempo restante más corto
-    val sortedMeds = meds.sortedBy { med ->
-        calculateDurationUntilNext(med, now).toSeconds()
-    }
+    val sortedMeds = meds.ordenarPorProximidad()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -375,19 +380,23 @@ fun HomeView(onAddMedication: () -> Unit) {
                 now = now,
                 isNext = true,
                 onMarcarTomado = {
-                    val index = Repository.medicamentos.indexOf(next)
-                    if (index != -1) {
-                        val ahora = LocalDateTime.now()
-                        val nuevasTomasList = next.historialTomas.toMutableList()
-                        nuevasTomasList.add(ahora)
-                        Repository.medicamentos[index] = next.copy(
-                            ultimaToma = ahora,
-                            historialTomas = nuevasTomasList
-                        )
-                        scope.launch {
-                            snackbarHostState.showSnackbar("${next.nombre} marcado como tomado")
+                    processWithCallback(
+                        item = next,
+                        onSuccess = { med ->
+                            Repository.modificarMedicamento(med) { medicamento ->
+                                val ahora = LocalDateTime.now()
+                                val nuevasTomasList = medicamento.historialTomas.toMutableList()
+                                nuevasTomasList.add(ahora)
+                                medicamento.copy(
+                                    ultimaToma = ahora,
+                                    historialTomas = nuevasTomasList
+                                )
+                            }
+                            scope.launch {
+                                snackbarHostState.showSnackbar("${med.nombre} marcado como tomado")
+                            }
                         }
-                    }
+                    )
                 }
             )
 
@@ -402,19 +411,23 @@ fun HomeView(onAddMedication: () -> Unit) {
                             now = now,
                             isNext = false,
                             onMarcarTomado = {
-                                val index = Repository.medicamentos.indexOf(med)
-                                if (index != -1) {
-                                    val ahora = LocalDateTime.now()
-                                    val nuevasTomasList = med.historialTomas.toMutableList()
-                                    nuevasTomasList.add(ahora)
-                                    Repository.medicamentos[index] = med.copy(
-                                        ultimaToma = ahora,
-                                        historialTomas = nuevasTomasList
-                                    )
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("${med.nombre} marcado como tomado")
+                                processWithCallback(
+                                    item = med,
+                                    onSuccess = { medicamento ->
+                                        Repository.modificarMedicamento(medicamento) { m ->
+                                            val ahora = LocalDateTime.now()
+                                            val nuevasTomasList = m.historialTomas.toMutableList()
+                                            nuevasTomasList.add(ahora)
+                                            m.copy(
+                                                ultimaToma = ahora,
+                                                historialTomas = nuevasTomasList
+                                            )
+                                        }
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("${medicamento.nombre} marcado como tomado")
+                                        }
                                     }
-                                }
+                                )
                             }
                         )
                     }
@@ -442,9 +455,9 @@ fun HomeView(onAddMedication: () -> Unit) {
 @Composable
 fun MedicationCard(med: Medicamento, now: LocalTime, isNext: Boolean, onMarcarTomado: () -> Unit) {
     val ahora = LocalDateTime.now()
-    val duration = calculateDurationUntilNext(med, now)
-    val atrasado = estaAtrasado(med, ahora)
-    val proximaToma = calcularProximaToma(med, ahora)
+    val atrasado = med.estaAtrasado(ahora)
+    val proximaToma = med.calcularProximaToma(ahora)
+    val duration = Duration.between(ahora, proximaToma)
 
     val h = duration.toHours().coerceAtLeast(0)
     val m = duration.toMinutes().coerceAtLeast(0) % 60
@@ -751,13 +764,17 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
         Spacer(modifier = Modifier.height(24.dp))
         Button(
             onClick = {
-                if (nombre.isNotBlank() && cantidadDosis.isNotBlank()) {
-                    val dosisCompleta = "$cantidadDosis ${formatos[formatoSeleccionado]}"
-                    Repository.agregarMedicamento(Medicamento(nombre, dosisCompleta, intervaloSelected, selectedTime, diario))
-                    onSaved()
-                } else {
-                    if (nombre.isBlank()) nombreError = true
-                    if (cantidadDosis.isBlank()) dosisError = true
+                val esValido = validarCampos(
+                    (nombre.isNotBlank()) to { nombreError = true },
+                    (cantidadDosis.isNotBlank()) to { dosisError = true }
+                )
+
+                if (esValido) {
+                    executeWithTryCatch(Unit) {
+                        val dosisCompleta = "$cantidadDosis ${formatos[formatoSeleccionado]}"
+                        Repository.agregarMedicamento(Medicamento(nombre, dosisCompleta, intervaloSelected, selectedTime, diario))
+                        onSaved()
+                    }
                 }
             },
             modifier = Modifier.fillMaxWidth().height(64.dp)
@@ -983,7 +1000,7 @@ fun HistorialView() {
                                 Text(nombre, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                                 Text("Dosis: $dosis", fontSize = 16.sp)
                                 Text(
-                                    toma.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")),
+                                    toma.formatFriendly(),
                                     fontSize = 14.sp,
                                     color = Color.Gray
                                 )
