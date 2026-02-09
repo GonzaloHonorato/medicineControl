@@ -560,7 +560,9 @@ fun estaAtrasado(med: Medicamento, ahora: LocalDateTime): Boolean {
 @Composable
 fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
     var nombre by remember { mutableStateOf("") }
-    var dosis by remember { mutableStateOf("") }
+    var cantidadDosis by remember { mutableStateOf("") }
+    var formatoSeleccionado by remember { mutableStateOf("Pastillas") }
+    var menuFormatoOpen by remember { mutableStateOf(false) }
     var intervaloSelected by remember { mutableIntStateOf(8) }
     var selectedTime by remember { mutableStateOf(LocalTime.now().withSecond(0).withNano(0)) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -569,6 +571,16 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
 
     var nombreError by remember { mutableStateOf(false) }
     var dosisError by remember { mutableStateOf(false) }
+
+    val formatos = mapOf(
+        "Pastillas" to "pastilla(s)",
+        "Comprimidos" to "mg",
+        "Jarabe" to "ml",
+        "Gotas" to "gotas",
+        "Cápsulas" to "cápsula(s)",
+        "Inyección" to "ml",
+        "Sobres" to "sobre(s)"
+    )
 
     val timeState = rememberTimePickerState(
         initialHour = selectedTime.hour,
@@ -610,7 +622,15 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
                             text = { Text("${med.nombre} - ${med.dosis}", fontSize = 16.sp) },
                             onClick = {
                                 nombre = med.nombre
-                                dosis = med.dosis
+                                // Intentar extraer cantidad y formato de la dosis
+                                val partes = med.dosis.split(" ", limit = 2)
+                                if (partes.size == 2) {
+                                    cantidadDosis = partes[0]
+                                    // Buscar formato que coincida
+                                    formatos.entries.find { it.value == partes[1] }?.let {
+                                        formatoSeleccionado = it.key
+                                    }
+                                }
                                 showCatalogMenu = false
                             }
                         )
@@ -638,19 +658,55 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        Box {
+            OutlinedButton(
+                onClick = { menuFormatoOpen = true },
+                modifier = Modifier.fillMaxWidth().height(70.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(horizontalAlignment = Alignment.Start) {
+                        Text("Seleccione formato", fontSize = 14.sp, color = Color.Gray)
+                        Text(formatoSeleccionado, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Text("▼", fontSize = 20.sp)
+                }
+            }
+            DropdownMenu(
+                expanded = menuFormatoOpen,
+                onDismissRequest = { menuFormatoOpen = false }
+            ) {
+                formatos.keys.forEach { formato ->
+                    DropdownMenuItem(
+                        text = { Text(formato, fontSize = 18.sp) },
+                        onClick = {
+                            formatoSeleccionado = formato
+                            menuFormatoOpen = false
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
         OutlinedTextField(
-            value = dosis,
+            value = cantidadDosis,
             onValueChange = {
-                dosis = it
+                cantidadDosis = it
                 dosisError = false
             },
-            label = { Text("Dosis", fontSize = 18.sp) },
+            label = { Text("Cantidad", fontSize = 18.sp) },
             isError = dosisError,
             modifier = Modifier.fillMaxWidth().height(70.dp),
-            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp)
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            suffix = { Text(formatos[formatoSeleccionado] ?: "", fontSize = 16.sp, color = Color.Gray) }
         )
         if (dosisError) {
-            Text("La dosis es obligatoria", color = Color.Red, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp))
+            Text("La cantidad es obligatoria", color = Color.Red, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp))
         }
         
         Spacer(modifier = Modifier.height(20.dp))
@@ -695,12 +751,13 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
         Spacer(modifier = Modifier.height(24.dp))
         Button(
             onClick = {
-                if (nombre.isNotBlank() && dosis.isNotBlank()) {
-                    Repository.agregarMedicamento(Medicamento(nombre, dosis, intervaloSelected, selectedTime, diario))
+                if (nombre.isNotBlank() && cantidadDosis.isNotBlank()) {
+                    val dosisCompleta = "$cantidadDosis ${formatos[formatoSeleccionado]}"
+                    Repository.agregarMedicamento(Medicamento(nombre, dosisCompleta, intervaloSelected, selectedTime, diario))
                     onSaved()
                 } else {
                     if (nombre.isBlank()) nombreError = true
-                    if (dosis.isBlank()) dosisError = true
+                    if (cantidadDosis.isBlank()) dosisError = true
                 }
             },
             modifier = Modifier.fillMaxWidth().height(64.dp)
@@ -733,7 +790,19 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
 fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
     var showDialog by remember { mutableStateOf(false) }
     var nombre by remember { mutableStateOf("") }
-    var dosis by remember { mutableStateOf("") }
+    var cantidadDosis by remember { mutableStateOf("") }
+    var formatoSeleccionado by remember { mutableStateOf("Pastillas") }
+    var menuFormatoOpen by remember { mutableStateOf(false) }
+
+    val formatos = mapOf(
+        "Pastillas" to "pastilla(s)",
+        "Comprimidos" to "mg",
+        "Jarabe" to "ml",
+        "Gotas" to "gotas",
+        "Cápsulas" to "cápsula(s)",
+        "Inyección" to "ml",
+        "Sobres" to "sobre(s)"
+    )
 
     if (showDialog) {
         AlertDialog(
@@ -748,22 +817,61 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Box {
+                        OutlinedButton(
+                            onClick = { menuFormatoOpen = true },
+                            modifier = Modifier.fillMaxWidth().height(56.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(horizontalAlignment = Alignment.Start) {
+                                    Text("Seleccione formato", fontSize = 12.sp, color = Color.Gray)
+                                    Text(formatoSeleccionado, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Text("▼", fontSize = 16.sp)
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = menuFormatoOpen,
+                            onDismissRequest = { menuFormatoOpen = false }
+                        ) {
+                            formatos.keys.forEach { formato ->
+                                DropdownMenuItem(
+                                    text = { Text(formato, fontSize = 16.sp) },
+                                    onClick = {
+                                        formatoSeleccionado = formato
+                                        menuFormatoOpen = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
-                        value = dosis,
-                        onValueChange = { dosis = it },
-                        label = { Text("Dosis", fontSize = 16.sp) },
+                        value = cantidadDosis,
+                        onValueChange = { cantidadDosis = it },
+                        label = { Text("Cantidad", fontSize = 16.sp) },
                         modifier = Modifier.fillMaxWidth(),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        suffix = { Text(formatos[formatoSeleccionado] ?: "", fontSize = 14.sp, color = Color.Gray) }
                     )
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (nombre.isNotBlank() && dosis.isNotBlank()) {
-                        Repository.agregarAlCatalogo(MedicamentoCatalogo(nombre, dosis))
+                    if (nombre.isNotBlank() && cantidadDosis.isNotBlank()) {
+                        val dosisCompleta = "$cantidadDosis ${formatos[formatoSeleccionado]}"
+                        Repository.agregarAlCatalogo(MedicamentoCatalogo(nombre, dosisCompleta))
                         nombre = ""
-                        dosis = ""
+                        cantidadDosis = ""
+                        formatoSeleccionado = "Pastillas"
                         showDialog = false
                     }
                 }) {
@@ -771,7 +879,12 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDialog = false }) {
+                TextButton(onClick = {
+                    showDialog = false
+                    nombre = ""
+                    cantidadDosis = ""
+                    formatoSeleccionado = "Pastillas"
+                }) {
                     Text("Cancelar", fontSize = 16.sp)
                 }
             }
