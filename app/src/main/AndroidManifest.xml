@@ -11,6 +11,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MedicineControl">
+
+        <!-- Launcher Activity (Login/Register/Recover) -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -18,10 +20,35 @@
             android:theme="@style/Theme.MedicineControl">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Home Activity con Fragments + BottomNavigation -->
+        <activity
+            android:name=".HomeActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.MedicineControl" />
+
+        <!-- Content Provider para exponer medicamentos via content:// URI -->
+        <provider
+            android:name=".provider.MedicineContentProvider"
+            android:authorities="com.example.medicinecontrol.provider"
+            android:exported="false" />
+
+        <!-- App Widget Receiver -->
+        <receiver
+            android:name=".widget.MedicineWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/medicine_widget_info" />
+        </receiver>
+
     </application>
 
 </manifest>

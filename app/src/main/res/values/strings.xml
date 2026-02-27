@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">MedicineControl</string>
+    <string name="widget_title">MedicineControl</string>
+    <string name="widget_description">Muestra tu próximo medicamento</string>
 </resources>
