@@ -62,6 +62,37 @@ data class MedicamentoCatalogo(
     }
 }
 
+// Registro individual de una toma con geolocalización
+data class RegistroToma(
+    val fechaHora: LocalDateTime,
+    val latitud: Double? = null,
+    val longitud: Double? = null,
+    val direccion: String? = null
+) {
+    fun toMap(): Map<String, Any?> = mapOf(
+        "fechaHora" to fechaHora.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+        "latitud" to latitud,
+        "longitud" to longitud,
+        "direccion" to direccion
+    )
+
+    companion object {
+        fun fromMap(map: Map<String, Any?>): RegistroToma? {
+            return try {
+                val fechaStr = map["fechaHora"] as? String ?: return null
+                RegistroToma(
+                    fechaHora = LocalDateTime.parse(fechaStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                    latitud = (map["latitud"] as? Number)?.toDouble(),
+                    longitud = (map["longitud"] as? Number)?.toDouble(),
+                    direccion = map["direccion"] as? String
+                )
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+}
+
 // Medicamento programado con horarios
 data class Medicamento(
     val nombre: String,
@@ -70,7 +101,7 @@ data class Medicamento(
     val horaInicial: LocalTime,
     val repetirDiario: Boolean,
     val ultimaToma: LocalDateTime? = null,
-    val historialTomas: MutableList<LocalDateTime> = mutableListOf(),
+    val historialTomas: MutableList<RegistroToma> = mutableListOf(),
     val firestoreId: String = ""
 ) {
     fun toMap(): Map<String, Any> {
@@ -80,7 +111,7 @@ data class Medicamento(
             "intervaloHoras" to intervaloHoras,
             "horaInicial" to horaInicial.format(DateTimeFormatter.ofPattern("HH:mm")),
             "repetirDiario" to repetirDiario,
-            "historialTomas" to historialTomas.map { it.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) }
+            "historialTomas" to historialTomas.map { it.toMap() }
         )
         if (ultimaToma != null) {
             map["ultimaToma"] = ultimaToma.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
@@ -92,10 +123,23 @@ data class Medicamento(
         fun fromDocument(doc: DocumentSnapshot): Medicamento? {
             return try {
                 val historialList = (doc.get("historialTomas") as? List<*>)
-                    ?.mapNotNull { it as? String }
-                    ?.mapNotNull {
-                        try { LocalDateTime.parse(it, DateTimeFormatter.ISO_LOCAL_DATE_TIME) }
-                        catch (e: Exception) { null }
+                    ?.mapNotNull { item ->
+                        when (item) {
+                            // Nuevo formato: Map con fechaHora, latitud, etc.
+                            is Map<*, *> -> {
+                                @Suppress("UNCHECKED_CAST")
+                                RegistroToma.fromMap(item as Map<String, Any?>)
+                            }
+                            // Legacy: String ISO date
+                            is String -> {
+                                try {
+                                    RegistroToma(
+                                        fechaHora = LocalDateTime.parse(item, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                    )
+                                } catch (e: Exception) { null }
+                            }
+                            else -> null
+                        }
                     }
                     ?.toMutableList() ?: mutableListOf()
 

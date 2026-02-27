@@ -10,19 +10,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import com.example.medicinecontrol.HomeActivity
+import com.example.medicinecontrol.LocationHelper
 import com.example.medicinecontrol.R
 import com.example.medicinecontrol.Repository
 import com.example.medicinecontrol.ui.theme.MedicineControlTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class ProfileFragment : Fragment() {
 
@@ -54,12 +59,25 @@ class ProfileFragment : Fragment() {
 
 @Composable
 fun ProfileContent(onLogout: () -> Unit) {
+    val context = LocalContext.current
     val usuario = Repository.usuarioActual
     val userName = usuario?.nombre?.ifBlank { null } ?: "Usuario"
     val userEmail = usuario?.email ?: "Sin correo"
     val medicamentos by Repository.medicamentosFlow.collectAsState()
     val catalogo by Repository.catalogoFlow.collectAsState()
     val totalTomas = medicamentos.sumOf { it.historialTomas.size }
+    var cityName by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        if (LocationHelper.hasLocationPermission(context)) {
+            val location = LocationHelper.getCurrentLocation(context)
+            if (location != null) {
+                cityName = withContext(Dispatchers.IO) {
+                    LocationHelper.getCityName(context, location.latitude, location.longitude)
+                }
+            }
+        }
+    }
 
     var notificaciones by remember { mutableStateOf(true) }
     var sonido by remember { mutableStateOf(false) }
@@ -99,6 +117,23 @@ fun ProfileContent(onLogout: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
+                if (cityName != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            cityName!!,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
+                }
             }
         }
 

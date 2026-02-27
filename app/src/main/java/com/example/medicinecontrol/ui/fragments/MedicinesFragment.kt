@@ -27,6 +27,7 @@ import com.example.medicinecontrol.HomeActivity
 import com.example.medicinecontrol.MedicamentoCatalogo
 import com.example.medicinecontrol.R
 import com.example.medicinecontrol.Repository
+import com.example.medicinecontrol.SpeechToTextButton
 import com.example.medicinecontrol.ui.theme.MedicineControlTheme
 import kotlinx.coroutines.launch
 
@@ -85,12 +86,18 @@ fun MedicinesContent(onNavigateToHome: () -> Unit) {
             title = { Text("Nuevo Medicamento", style = MaterialTheme.typography.headlineSmall) },
             text = {
                 Column {
-                    OutlinedTextField(
-                        value = nombre,
-                        onValueChange = { nombre = it },
-                        label = { Text("Nombre") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = nombre,
+                            onValueChange = { nombre = it },
+                            label = { Text("Nombre") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        SpeechToTextButton { text -> nombre = text }
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
                     Box {
                         OutlinedButton(

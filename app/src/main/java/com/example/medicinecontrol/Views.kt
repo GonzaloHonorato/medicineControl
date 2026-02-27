@@ -1,5 +1,8 @@
 package com.example.medicinecontrol
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -7,19 +10,24 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -427,12 +435,30 @@ fun RecoverPasswordView(onBack: () -> Unit) {
 
 @Composable
 fun HomeView(onAddMedication: () -> Unit) {
+    val context = LocalContext.current
     val meds by Repository.medicamentosFlow.collectAsState()
     var now by remember { mutableStateOf(LocalTime.now()) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var locationPermissionGranted by remember {
+        mutableStateOf(LocationHelper.hasLocationPermission(context))
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        locationPermissionGranted = permissions.values.any { it }
+    }
 
     LaunchedEffect(Unit) {
+        if (!locationPermissionGranted) {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
         while (true) {
             now = LocalTime.now()
             delay(1000)
@@ -472,10 +498,24 @@ fun HomeView(onAddMedication: () -> Unit) {
                 isNext = true,
                 onMarcarTomado = {
                     scope.launch {
+                        val ahora = LocalDateTime.now()
+                        val location = if (locationPermissionGranted) {
+                            LocationHelper.getCurrentLocation(context)
+                        } else null
+                        val direccion = location?.let {
+                            withContext(Dispatchers.IO) {
+                                LocationHelper.getFullAddress(context, it.latitude, it.longitude)
+                            }
+                        }
+                        val registro = RegistroToma(
+                            fechaHora = ahora,
+                            latitud = location?.latitude,
+                            longitud = location?.longitude,
+                            direccion = direccion
+                        )
                         Repository.modificarMedicamento(next) { medicamento ->
-                            val ahora = LocalDateTime.now()
                             val nuevasTomasList = medicamento.historialTomas.toMutableList()
-                            nuevasTomasList.add(ahora)
+                            nuevasTomasList.add(registro)
                             medicamento.copy(
                                 ultimaToma = ahora,
                                 historialTomas = nuevasTomasList
@@ -498,10 +538,24 @@ fun HomeView(onAddMedication: () -> Unit) {
                             isNext = false,
                             onMarcarTomado = {
                                 scope.launch {
+                                    val ahora = LocalDateTime.now()
+                                    val location = if (locationPermissionGranted) {
+                                        LocationHelper.getCurrentLocation(context)
+                                    } else null
+                                    val direccion = location?.let {
+                                        withContext(Dispatchers.IO) {
+                                            LocationHelper.getFullAddress(context, it.latitude, it.longitude)
+                                        }
+                                    }
+                                    val registro = RegistroToma(
+                                        fechaHora = ahora,
+                                        latitud = location?.latitude,
+                                        longitud = location?.longitude,
+                                        direccion = direccion
+                                    )
                                     Repository.modificarMedicamento(med) { m ->
-                                        val ahora = LocalDateTime.now()
                                         val nuevasTomasList = m.historialTomas.toMutableList()
-                                        nuevasTomasList.add(ahora)
+                                        nuevasTomasList.add(registro)
                                         m.copy(
                                             ultimaToma = ahora,
                                             historialTomas = nuevasTomasList
@@ -741,18 +795,27 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        OutlinedTextField(
-            value = nombre,
-            onValueChange = {
-                nombre = it
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = nombre,
+                onValueChange = {
+                    nombre = it
+                    nombreError = false
+                },
+                label = { Text("Nombre", fontSize = 18.sp) },
+                isError = nombreError,
+                modifier = Modifier.weight(1f).height(70.dp),
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp),
+                enabled = !isLoading
+            )
+            SpeechToTextButton { text ->
+                nombre = text
                 nombreError = false
-            },
-            label = { Text("Nombre", fontSize = 18.sp) },
-            isError = nombreError,
-            modifier = Modifier.fillMaxWidth().height(70.dp),
-            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp),
-            enabled = !isLoading
-        )
+            }
+        }
         if (nombreError) {
             Text("El nombre es obligatorio", color = Color.Red, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp))
         }
@@ -933,13 +996,19 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
             title = { Text("Nuevo Medicamento", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    OutlinedTextField(
-                        value = nombre,
-                        onValueChange = { nombre = it },
-                        label = { Text("Nombre", fontSize = 16.sp) },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
-                    )
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = nombre,
+                            onValueChange = { nombre = it },
+                            label = { Text("Nombre", fontSize = 16.sp) },
+                            modifier = Modifier.weight(1f),
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
+                        )
+                        SpeechToTextButton { text -> nombre = text }
+                    }
 
                     Spacer(modifier = Modifier.height(16.dp))
                     Box {
@@ -1084,10 +1153,10 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
 fun HistorialView() {
     val medicamentos by Repository.medicamentosFlow.collectAsState()
     val allTomas = medicamentos.flatMap { med ->
-        med.historialTomas.map { toma ->
-            Triple(med.nombre, med.dosis, toma)
+        med.historialTomas.map { registro ->
+            Triple(med.nombre, med.dosis, registro)
         }
-    }.sortedByDescending { it.third }
+    }.sortedByDescending { it.third.fechaHora }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Historial de Tomas", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
@@ -1111,7 +1180,7 @@ fun HistorialView() {
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(allTomas) { (nombre, dosis, toma) ->
+                items(allTomas) { (nombre, dosis, registro) ->
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier.padding(16.dp),
@@ -1122,10 +1191,28 @@ fun HistorialView() {
                                 Text(nombre, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                                 Text("Dosis: $dosis", fontSize = 16.sp)
                                 Text(
-                                    toma.formatFriendly(),
+                                    registro.fechaHora.formatFriendly(),
                                     fontSize = 14.sp,
                                     color = Color.Gray
                                 )
+                                if (registro.direccion != null) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            Icons.Default.LocationOn,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = Color.Gray
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(registro.direccion, fontSize = 12.sp, color = Color.Gray)
+                                    }
+                                } else if (registro.latitud != null && registro.longitud != null) {
+                                    Text(
+                                        "%.4f, %.4f".format(registro.latitud, registro.longitud),
+                                        fontSize = 12.sp,
+                                        color = Color.Gray
+                                    )
+                                }
                             }
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_menu_agenda),
@@ -1143,7 +1230,20 @@ fun HistorialView() {
 
 @Composable
 fun MyAccountView(onLogout: () -> Unit) {
+    val context = LocalContext.current
     val usuario = Repository.usuarioActual
+    var cityName by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        if (LocationHelper.hasLocationPermission(context)) {
+            val location = LocationHelper.getCurrentLocation(context)
+            if (location != null) {
+                cityName = withContext(Dispatchers.IO) {
+                    LocationHelper.getCityName(context, location.latitude, location.longitude)
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -1166,6 +1266,21 @@ fun MyAccountView(onLogout: () -> Unit) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("Email", fontSize = 14.sp, color = Color.Gray)
                     Text(usuario.email, fontSize = 18.sp)
+
+                    if (cityName != null) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Ubicación", fontSize = 14.sp, color = Color.Gray)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(cityName!!, fontSize = 18.sp)
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("Accesibilidad", fontSize = 14.sp, color = Color.Gray)

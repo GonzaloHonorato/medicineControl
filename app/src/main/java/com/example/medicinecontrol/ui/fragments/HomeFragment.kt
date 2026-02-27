@@ -1,9 +1,12 @@
 package com.example.medicinecontrol.ui.fragments
 
+import android.Manifest
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,19 +20,24 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import com.example.medicinecontrol.HomeActivity
+import com.example.medicinecontrol.LocationHelper
 import com.example.medicinecontrol.R
+import com.example.medicinecontrol.RegistroToma
 import com.example.medicinecontrol.Repository
 import com.example.medicinecontrol.ui.theme.MedicineControlTheme
 import com.example.medicinecontrol.ordenarPorProximidad
 import com.example.medicinecontrol.calcularProximaToma
 import com.example.medicinecontrol.MedicationCard
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -64,6 +72,7 @@ class HomeFragment : Fragment() {
 
 @Composable
 fun HomeContent(onAddMedication: () -> Unit) {
+    val context = LocalContext.current
     val meds by Repository.medicamentosFlow.collectAsState()
     val catalogo by Repository.catalogoFlow.collectAsState()
     val usuario = Repository.usuarioActual
@@ -71,8 +80,25 @@ fun HomeContent(onAddMedication: () -> Unit) {
     var now by remember { mutableStateOf(LocalTime.now()) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var locationPermissionGranted by remember {
+        mutableStateOf(LocationHelper.hasLocationPermission(context))
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        locationPermissionGranted = permissions.values.any { it }
+    }
 
     LaunchedEffect(Unit) {
+        if (!locationPermissionGranted) {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
         while (true) {
             now = LocalTime.now()
             delay(1000)
@@ -257,10 +283,24 @@ fun HomeContent(onAddMedication: () -> Unit) {
                         isNext = index == 0,
                         onMarcarTomado = {
                             scope.launch {
+                                val ahora = LocalDateTime.now()
+                                val location = if (locationPermissionGranted) {
+                                    LocationHelper.getCurrentLocation(context)
+                                } else null
+                                val direccion = location?.let {
+                                    withContext(Dispatchers.IO) {
+                                        LocationHelper.getFullAddress(context, it.latitude, it.longitude)
+                                    }
+                                }
+                                val registro = RegistroToma(
+                                    fechaHora = ahora,
+                                    latitud = location?.latitude,
+                                    longitud = location?.longitude,
+                                    direccion = direccion
+                                )
                                 Repository.modificarMedicamento(med) { m ->
-                                    val ahora = LocalDateTime.now()
                                     val nuevasTomasList = m.historialTomas.toMutableList()
-                                    nuevasTomasList.add(ahora)
+                                    nuevasTomasList.add(registro)
                                     m.copy(ultimaToma = ahora, historialTomas = nuevasTomasList)
                                 }
                                 snackbarHostState.showSnackbar("${med.nombre} marcado como tomado")

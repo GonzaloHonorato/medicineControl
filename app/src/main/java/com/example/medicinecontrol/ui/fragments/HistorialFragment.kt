@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +21,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import com.example.medicinecontrol.R
+import com.example.medicinecontrol.RegistroToma
 import com.example.medicinecontrol.Repository
 import com.example.medicinecontrol.formatFriendly
 import com.example.medicinecontrol.ui.theme.MedicineControlTheme
@@ -52,8 +54,8 @@ class HistorialFragment : Fragment() {
 fun HistorialContent() {
     val medicamentos by Repository.medicamentosFlow.collectAsState()
     val allTomas = medicamentos.flatMap { med ->
-        med.historialTomas.map { toma -> Triple(med.nombre, med.dosis, toma) }
-    }.sortedByDescending { it.third }
+        med.historialTomas.map { registro -> Triple(med.nombre, med.dosis, registro) }
+    }.sortedByDescending { it.third.fechaHora }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Historial de Tomas", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
@@ -95,7 +97,7 @@ fun HistorialContent() {
             Spacer(modifier = Modifier.height(8.dp))
 
             LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(allTomas) { (nombre, dosis, toma) ->
+                items(allTomas) { (nombre, dosis, registro) ->
                     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
@@ -103,7 +105,29 @@ fun HistorialContent() {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(nombre, style = MaterialTheme.typography.titleMedium)
                                 Text("Dosis: $dosis", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(toma.formatFriendly(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))
+                                Text(registro.fechaHora.formatFriendly(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))
+                                if (registro.direccion != null) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            Icons.Default.LocationOn,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            registro.direccion,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                } else if (registro.latitud != null && registro.longitud != null) {
+                                    Text(
+                                        "%.4f, %.4f".format(registro.latitud, registro.longitud),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
