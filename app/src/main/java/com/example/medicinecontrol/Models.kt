@@ -73,15 +73,20 @@ data class Medicamento(
     val historialTomas: MutableList<LocalDateTime> = mutableListOf(),
     val firestoreId: String = ""
 ) {
-    fun toMap(): Map<String, Any?> = mapOf(
-        "nombre" to nombre,
-        "dosis" to dosis,
-        "intervaloHoras" to intervaloHoras,
-        "horaInicial" to horaInicial.format(DateTimeFormatter.ofPattern("HH:mm")),
-        "repetirDiario" to repetirDiario,
-        "ultimaToma" to ultimaToma?.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-        "historialTomas" to historialTomas.map { it.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) }
-    )
+    fun toMap(): Map<String, Any> {
+        val map = mutableMapOf<String, Any>(
+            "nombre" to nombre,
+            "dosis" to dosis,
+            "intervaloHoras" to intervaloHoras,
+            "horaInicial" to horaInicial.format(DateTimeFormatter.ofPattern("HH:mm")),
+            "repetirDiario" to repetirDiario,
+            "historialTomas" to historialTomas.map { it.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) }
+        )
+        if (ultimaToma != null) {
+            map["ultimaToma"] = ultimaToma.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+        }
+        return map
+    }
 
     companion object {
         fun fromDocument(doc: DocumentSnapshot): Medicamento? {
