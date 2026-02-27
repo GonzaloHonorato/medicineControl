@@ -1,75 +1,104 @@
 package com.example.medicinecontrol
 
-import androidx.compose.runtime.mutableStateListOf
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.tasks.await
 
 object Repository {
-    val usuarios = mutableStateListOf<User>(
-        User("Usuario 1", "test1@test.com", "123456"),
-        User("Usuario 2", "test2@test.com", "123456"),
-        User("Usuario 3", "test3@test.com", "123456"),
-        User("Usuario 4", "test4@test.com", "123456"),
-        User("Usuario 5", "test5@test.com", "123456")
-    )
+    private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 
     // Usuario actualmente logueado
     var usuarioActual: User? = null
 
-    // Catálogo de medicamentos guardados
-    val catalogo = mutableStateListOf<MedicamentoCatalogo>()
+    private val _catalogoFlow = MutableStateFlow<List<MedicamentoCatalogo>>(emptyList())
+    val catalogoFlow: StateFlow<List<MedicamentoCatalogo>> = _catalogoFlow
 
-    // Medicamentos programados
-    val medicamentos = mutableStateListOf<Medicamento>()
+    private val _medicamentosFlow = MutableStateFlow<List<Medicamento>>(emptyList())
+    val medicamentosFlow: StateFlow<List<Medicamento>> = _medicamentosFlow
 
-    fun agregarUsuario(user: User): Boolean {
-        usuarios.add(user)
-        return true
-    }
+    val catalogo: List<MedicamentoCatalogo> get() = _catalogoFlow.value
+    val medicamentos: List<Medicamento> get() = _medicamentosFlow.value
 
-    fun iniciarSesion(user: User) {
-        usuarioActual = user
-    }
+    private fun getUserId(): String? = UserRepository.getCurrentUser()?.uid
 
-    fun cerrarSesion() {
-        usuarioActual = null
-        catalogo.clear()
-        medicamentos.clear()
-    }
-
-    fun agregarAlCatalogo(med: MedicamentoCatalogo) {
-        catalogo.add(med)
-    }
-
-    fun agregarMedicamento(med: Medicamento) {
-        medicamentos.add(med)
-    }
-
-    fun marcarComoTomado(med: Medicamento) {
-        executeWithTryCatch(Unit) {
-            val index = medicamentos.indexOf(med)
-            if (index != -1) {
-                medicamentos[index] = med.copy(ultimaToma = java.time.LocalDateTime.now())
-            }
+    suspend fun cargarCatalogo() {
+        val uid = getUserId() ?: return
+        try {
+            val snapshot = db.collection("users").document(uid)
+                .collection("catalogo").get().await()
+            val lista = snapshot.documents.mapNotNull { MedicamentoCatalogo.fromDocument(it) }
+            _catalogoFlow.value = lista
+        } catch (e: Exception) {
+            _catalogoFlow.value = emptyList()
         }
     }
 
-    fun modificarMedicamento(med: Medicamento, transform: (Medicamento) -> Medicamento) {
-        executeWithTryCatch(Unit) {
-            val index = medicamentos.indexOf(med)
-            if (index != -1) {
-                medicamentos[index] = transform(medicamentos[index])
-            }
+    suspend fun cargarMedicamentos() {
+        val uid = getUserId() ?: return
+        try {
+            val snapshot = db.collection("users").document(uid)
+                .collection("medicamentos").get().await()
+            val lista = snapshot.documents.mapNotNull { Medicamento.fromDocument(it) }
+            _medicamentosFlow.value = lista
+        } catch (e: Exception) {
+            _medicamentosFlow.value = emptyList()
         }
+    }
+
+    suspend fun agregarAlCatalogo(med: MedicamentoCatalogo) {
+        val uid = getUserId() ?: return
+        try {
+            val docRef = db.collection("users").document(uid)
+                .collection("catalogo").add(med.toMap()).await()
+            val nuevo = med.copy(firestoreId = docRef.id)
+            _catalogoFlow.value = _catalogoFlow.value + nuevo
+        } catch (_: Exception) {}
+    }
+
+    suspend fun agregarMedicamento(med: Medicamento) {
+        val uid = getUserId() ?: return
+        try {
+            val docRef = db.collection("users").document(uid)
+                .collection("medicamentos").add(med.toMap()).await()
+            val nuevo = med.copy(firestoreId = docRef.id)
+            _medicamentosFlow.value = _medicamentosFlow.value + nuevo
+        } catch (_: Exception) {}
+    }
+
+    suspend fun modificarMedicamento(med: Medicamento, transform: (Medicamento) -> Medicamento) {
+        val uid = getUserId() ?: return
+        try {
+            val updated = transform(med)
+            if (med.firestoreId.isNotEmpty()) {
+                db.collection("users").document(uid)
+                    .collection("medicamentos").document(med.firestoreId)
+                    .set(updated.toMap()).await()
+            }
+            _medicamentosFlow.value = _medicamentosFlow.value.map {
+                if (it.firestoreId == med.firestoreId && med.firestoreId.isNotEmpty()) updated
+                else if (it == med) updated
+                else it
+            }
+        } catch (_: Exception) {}
     }
 
     fun filtrarMedicamentos(predicate: (Medicamento) -> Boolean): List<Medicamento> {
         return executeWithTryCatch(emptyList()) {
-            medicamentos.filter(predicate)
+            _medicamentosFlow.value.filter(predicate)
         }
     }
 
     fun aplicarATodos(action: (Medicamento) -> Unit) {
         executeWithTryCatch(Unit) {
-            medicamentos.forEach(action)
+            _medicamentosFlow.value.forEach(action)
         }
+    }
+
+    fun cerrarSesion() {
+        UserRepository.logout()
+        usuarioActual = null
+        _catalogoFlow.value = emptyList()
+        _medicamentosFlow.value = emptyList()
     }
 }

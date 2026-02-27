@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.example.medicinecontrol.ui.theme.MedicineControlTheme
 
@@ -23,8 +24,22 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MedicineControlTheme {
-                var screen by remember { mutableStateOf("login") }
+                var screen by remember { mutableStateOf("splash") }
                 var selectedTab by remember { mutableIntStateOf(0) }
+
+                // Auto-login: check if user is already logged in
+                LaunchedEffect(Unit) {
+                    val currentUser = UserRepository.getCurrentUser()
+                    if (currentUser != null) {
+                        val profile = UserRepository.getUserProfile()
+                        Repository.usuarioActual = profile
+                        Repository.cargarCatalogo()
+                        Repository.cargarMedicamentos()
+                        screen = "home"
+                    } else {
+                        screen = "login"
+                    }
+                }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -73,6 +88,14 @@ class MainActivity : ComponentActivity() {
                 ) { padding ->
                     Box(modifier = Modifier.padding(padding)) {
                         when (screen) {
+                            "splash" -> {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator()
+                                }
+                            }
                             "login" -> LoginView(
                                 onLogin = {
                                     screen = "home"

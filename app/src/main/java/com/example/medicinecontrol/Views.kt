@@ -32,6 +32,8 @@ fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateT
     var password by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf("") }
     var emailError by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -46,17 +48,19 @@ fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateT
         Spacer(modifier = Modifier.height(16.dp))
         Text("MedicineControl", fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(40.dp))
-        
+
         TextField(
-            value = email, 
-            onValueChange = { 
-                email = it 
+            value = email,
+            onValueChange = {
+                email = it
                 emailError = false
-            }, 
-            label = { Text("Email") }, 
+                errorMsg = ""
+            },
+            label = { Text("Email") },
             isError = emailError,
             modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            enabled = !isLoading
         )
         if (emailError) {
             Text("Email no válido", color = Color.Red, fontSize = 12.sp, modifier = Modifier.align(Alignment.Start))
@@ -64,13 +68,17 @@ fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateT
 
         Spacer(modifier = Modifier.height(16.dp))
         TextField(
-            value = password, 
-            onValueChange = { password = it }, 
-            label = { Text("Contraseña") }, 
+            value = password,
+            onValueChange = {
+                password = it
+                errorMsg = ""
+            },
+            label = { Text("Contraseña") },
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
         )
-        
+
         if (errorMsg.isNotEmpty()) {
             Text(errorMsg, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
         }
@@ -80,44 +88,55 @@ fun LoginView(onLogin: () -> Unit, onNavigateToRegister: () -> Unit, onNavigateT
             onClick = {
                 val cleanEmail = email.trim()
                 if (cleanEmail.isValidEmail()) {
-                    executeWithTryCatch(Unit) {
-                        val user = Repository.usuarios.find { it.email == cleanEmail && it.contrasena == password }
-                        if (user != null) {
-                            Repository.iniciarSesion(user)
-                            onLogin()
-                        } else {
-                            errorMsg = "Usuario o clave incorrecta"
-                        }
+                    isLoading = true
+                    errorMsg = ""
+                    scope.launch {
+                        UserRepository.login(cleanEmail, password).fold(
+                            onSuccess = {
+                                val profile = UserRepository.getUserProfile()
+                                Repository.usuarioActual = profile
+                                Repository.cargarCatalogo()
+                                Repository.cargarMedicamentos()
+                                isLoading = false
+                                onLogin()
+                            },
+                            onFailure = { e ->
+                                isLoading = false
+                                errorMsg = when {
+                                    e.message?.contains("no user record", ignoreCase = true) == true ||
+                                    e.message?.contains("INVALID_LOGIN_CREDENTIALS", ignoreCase = true) == true ->
+                                        "Usuario o clave incorrecta"
+                                    e.message?.contains("badly formatted", ignoreCase = true) == true ->
+                                        "Email no válido"
+                                    e.message?.contains("network", ignoreCase = true) == true ->
+                                        "Error de conexión. Verifica tu internet"
+                                    else -> "Error: ${e.message}"
+                                }
+                            }
+                        )
                     }
                 } else {
                     emailError = true
                 }
             },
-            modifier = Modifier.fillMaxWidth().height(60.dp)
+            modifier = Modifier.fillMaxWidth().height(60.dp),
+            enabled = !isLoading
         ) {
-            Text("Ingresar", fontSize = 20.sp)
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Ingresar", fontSize = 20.sp)
+            }
         }
 
-        TextButton(onClick = onNavigateToRecover) {
+        TextButton(onClick = onNavigateToRecover, enabled = !isLoading) {
             Text("¿Olvidaste tu contraseña?", fontSize = 16.sp)
         }
-        TextButton(onClick = onNavigateToRegister) {
+        TextButton(onClick = onNavigateToRegister, enabled = !isLoading) {
             Text("Crear cuenta", fontSize = 16.sp)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        OutlinedButton(
-            onClick = {
-                val demoUser = Repository.usuarios.firstOrNull()
-                if (demoUser != null) {
-                    email = demoUser.email
-                    password = demoUser.contrasena
-                    emailError = false
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Usar datos demo")
         }
     }
 }
@@ -132,25 +151,29 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
     var largeText by remember { mutableStateOf(false) }
     var recordatorio by remember { mutableStateOf("Visual") }
     var menuOpen by remember { mutableStateOf(false) }
-    
+
     var nombreError by remember { mutableStateOf(false) }
     var emailError by remember { mutableStateOf(false) }
     var passError by remember { mutableStateOf(false) }
     var confirmError by remember { mutableStateOf(false) }
+    var errorMsg by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState())) {
         Text("Registro", fontSize = 30.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(24.dp))
 
         TextField(
-            value = nombre, 
-            onValueChange = { 
-                nombre = it 
+            value = nombre,
+            onValueChange = {
+                nombre = it
                 nombreError = false
-            }, 
-            label = { Text("Nombre") }, 
+            },
+            label = { Text("Nombre") },
             isError = nombreError,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
         )
         if (nombreError) {
             Text("El nombre es obligatorio", color = Color.Red, fontSize = 12.sp)
@@ -158,15 +181,16 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
 
         Spacer(modifier = Modifier.height(12.dp))
         TextField(
-            value = email, 
-            onValueChange = { 
-                email = it 
+            value = email,
+            onValueChange = {
+                email = it
                 emailError = false
-            }, 
+            },
             label = { Text("Email") },
             isError = emailError,
             modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            enabled = !isLoading
         )
         if (emailError) {
             Text("Email no válido u obligatorio", color = Color.Red, fontSize = 12.sp)
@@ -174,53 +198,55 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
 
         Spacer(modifier = Modifier.height(12.dp))
         TextField(
-            value = pass, 
-            onValueChange = { 
-                pass = it 
+            value = pass,
+            onValueChange = {
+                pass = it
                 passError = false
-            }, 
-            label = { Text("Contraseña") }, 
+            },
+            label = { Text("Contraseña") },
             isError = passError,
-            visualTransformation = PasswordVisualTransformation(), 
-            modifier = Modifier.fillMaxWidth()
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
         )
         if (passError) {
-            Text("La contraseña es obligatoria", color = Color.Red, fontSize = 12.sp)
+            Text("La contraseña es obligatoria (mínimo 6 caracteres)", color = Color.Red, fontSize = 12.sp)
         }
 
         Spacer(modifier = Modifier.height(12.dp))
         TextField(
-            value = confirm, 
-            onValueChange = { 
-                confirm = it 
+            value = confirm,
+            onValueChange = {
+                confirm = it
                 confirmError = false
-            }, 
-            label = { Text("Confirmar") }, 
+            },
+            label = { Text("Confirmar") },
             isError = confirmError,
-            visualTransformation = PasswordVisualTransformation(), 
-            modifier = Modifier.fillMaxWidth()
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
         )
         if (confirmError) {
             Text("Debe confirmar la contraseña", color = Color.Red, fontSize = 12.sp)
         }
-        
+
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
-            Checkbox(checked = accept, onCheckedChange = { accept = it })
+            Checkbox(checked = accept, onCheckedChange = { accept = it }, enabled = !isLoading)
             Text("Acepto términos", fontSize = 16.sp)
         }
 
         Text("Accesibilidad:", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(selected = !largeText, onClick = { largeText = false })
+            RadioButton(selected = !largeText, onClick = { largeText = false }, enabled = !isLoading)
             Text("Normal")
             Spacer(modifier = Modifier.width(16.dp))
-            RadioButton(selected = largeText, onClick = { largeText = true })
+            RadioButton(selected = largeText, onClick = { largeText = true }, enabled = !isLoading)
             Text("Grande")
         }
 
         Text("Recordatorio:", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
         Box {
-            OutlinedButton(onClick = { menuOpen = true }, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = { menuOpen = true }, modifier = Modifier.fillMaxWidth(), enabled = !isLoading) {
                 Text(recordatorio)
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -228,6 +254,11 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
                     DropdownMenuItem(text = { Text(it) }, onClick = { recordatorio = it; menuOpen = false })
                 }
             }
+        }
+
+        if (errorMsg.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(errorMsg, color = Color.Red, fontSize = 14.sp)
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -239,30 +270,62 @@ fun RegisterView(onRegistered: () -> Unit, onNavigateToLogin: () -> Unit) {
                 val esValido = validarCampos(
                     (nombre.isNotBlank()) to { nombreError = true },
                     (cleanEmail.isNotBlank() && isEmailValid) to { emailError = true },
-                    (pass.isNotBlank()) to { passError = true },
+                    (pass.isNotBlank() && pass.length >= 6) to { passError = true },
                     (confirm.isNotBlank()) to { confirmError = true },
                     (pass == confirm) to { confirmError = true },
                     (accept) to { }
                 )
 
                 if (esValido) {
-                    executeWithTryCatch(Unit) {
-                        val nuevoUsuario = User(nombre, cleanEmail, pass, largeText, recordatorio == "Visual")
-                        if (Repository.agregarUsuario(nuevoUsuario)) {
-                            Repository.iniciarSesion(nuevoUsuario)
-                            onRegistered()
-                        }
+                    isLoading = true
+                    errorMsg = ""
+                    scope.launch {
+                        UserRepository.register(
+                            email = cleanEmail,
+                            password = pass,
+                            nombre = nombre,
+                            accesibilidadGrande = largeText,
+                            recordatorioVisual = recordatorio == "Visual"
+                        ).fold(
+                            onSuccess = {
+                                val profile = UserRepository.getUserProfile()
+                                Repository.usuarioActual = profile
+                                isLoading = false
+                                onRegistered()
+                            },
+                            onFailure = { e ->
+                                isLoading = false
+                                errorMsg = when {
+                                    e.message?.contains("already in use", ignoreCase = true) == true ->
+                                        "Este email ya está registrado"
+                                    e.message?.contains("weak password", ignoreCase = true) == true ->
+                                        "La contraseña es muy débil (mínimo 6 caracteres)"
+                                    e.message?.contains("badly formatted", ignoreCase = true) == true ->
+                                        "Email no válido"
+                                    else -> "Error: ${e.message}"
+                                }
+                            }
+                        )
                     }
                 }
             },
-            modifier = Modifier.fillMaxWidth().height(60.dp)
+            modifier = Modifier.fillMaxWidth().height(60.dp),
+            enabled = !isLoading
         ) {
-            Text("Registrarme", fontSize = 18.sp)
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Registrarme", fontSize = 18.sp)
+            }
         }
 
         TextButton(
             onClick = onNavigateToLogin,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+            enabled = !isLoading
         ) {
             Text("Ya tiene una cuenta, inicie sesión", fontSize = 16.sp)
         }
@@ -275,54 +338,82 @@ fun RecoverPasswordView(onBack: () -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var isError by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMsg by remember { mutableStateOf("") }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp), 
+            modifier = Modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("Recuperar acceso", fontSize = 28.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             TextField(
-                value = email, 
-                onValueChange = { 
-                    email = it 
+                value = email,
+                onValueChange = {
+                    email = it
                     isError = false
-                }, 
+                    errorMsg = ""
+                },
                 label = { Text("Email") },
                 isError = isError,
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                enabled = !isLoading
             )
-            
+
             if (isError) {
                 Text("Email no válido", color = Color.Red, fontSize = 12.sp, modifier = Modifier.align(Alignment.Start))
+            }
+            if (errorMsg.isNotEmpty()) {
+                Text(errorMsg, color = Color.Red, fontSize = 12.sp, modifier = Modifier.align(Alignment.Start).padding(top = 4.dp))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
             Text("Se enviará un enlace de recuperación a su correo.", fontSize = 16.sp)
-            
+
             Spacer(modifier = Modifier.height(32.dp))
             Button(
                 onClick = {
                     val cleanEmail = email.trim()
                     if (cleanEmail.isValidEmail()) {
-                        executeWithTryCatch(Unit) {
-                            scope.launch {
-                                snackbarHostState.showSnackbar("Instrucciones enviadas a $cleanEmail")
-                            }
+                        isLoading = true
+                        errorMsg = ""
+                        scope.launch {
+                            UserRepository.recoverPassword(cleanEmail).fold(
+                                onSuccess = {
+                                    isLoading = false
+                                    snackbarHostState.showSnackbar("Instrucciones enviadas a $cleanEmail")
+                                },
+                                onFailure = { e ->
+                                    isLoading = false
+                                    errorMsg = when {
+                                        e.message?.contains("no user record", ignoreCase = true) == true ->
+                                            "No existe cuenta con este email"
+                                        else -> "Error: ${e.message}"
+                                    }
+                                }
+                            )
                         }
                     } else {
                         isError = true
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(56.dp)
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                enabled = !isLoading
             ) {
-                Text("Enviar instrucciones")
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Enviar instrucciones")
+                }
             }
-            TextButton(onClick = onBack) {
+            TextButton(onClick = onBack, enabled = !isLoading) {
                 Text("Volver", fontSize = 16.sp)
             }
         }
@@ -336,7 +427,7 @@ fun RecoverPasswordView(onBack: () -> Unit) {
 
 @Composable
 fun HomeView(onAddMedication: () -> Unit) {
-    val meds = Repository.medicamentos
+    val meds by Repository.medicamentosFlow.collectAsState()
     var now by remember { mutableStateOf(LocalTime.now()) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -355,7 +446,7 @@ fun HomeView(onAddMedication: () -> Unit) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Próximos medicamentos", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(modifier = Modifier.height(20.dp))
-        
+
         if (sortedMeds.isEmpty()) {
             Box(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -380,23 +471,18 @@ fun HomeView(onAddMedication: () -> Unit) {
                 now = now,
                 isNext = true,
                 onMarcarTomado = {
-                    processWithCallback(
-                        item = next,
-                        onSuccess = { med ->
-                            Repository.modificarMedicamento(med) { medicamento ->
-                                val ahora = LocalDateTime.now()
-                                val nuevasTomasList = medicamento.historialTomas.toMutableList()
-                                nuevasTomasList.add(ahora)
-                                medicamento.copy(
-                                    ultimaToma = ahora,
-                                    historialTomas = nuevasTomasList
-                                )
-                            }
-                            scope.launch {
-                                snackbarHostState.showSnackbar("${med.nombre} marcado como tomado")
-                            }
+                    scope.launch {
+                        Repository.modificarMedicamento(next) { medicamento ->
+                            val ahora = LocalDateTime.now()
+                            val nuevasTomasList = medicamento.historialTomas.toMutableList()
+                            nuevasTomasList.add(ahora)
+                            medicamento.copy(
+                                ultimaToma = ahora,
+                                historialTomas = nuevasTomasList
+                            )
                         }
-                    )
+                        snackbarHostState.showSnackbar("${next.nombre} marcado como tomado")
+                    }
                 }
             )
 
@@ -411,23 +497,18 @@ fun HomeView(onAddMedication: () -> Unit) {
                             now = now,
                             isNext = false,
                             onMarcarTomado = {
-                                processWithCallback(
-                                    item = med,
-                                    onSuccess = { medicamento ->
-                                        Repository.modificarMedicamento(medicamento) { m ->
-                                            val ahora = LocalDateTime.now()
-                                            val nuevasTomasList = m.historialTomas.toMutableList()
-                                            nuevasTomasList.add(ahora)
-                                            m.copy(
-                                                ultimaToma = ahora,
-                                                historialTomas = nuevasTomasList
-                                            )
-                                        }
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar("${medicamento.nombre} marcado como tomado")
-                                        }
+                                scope.launch {
+                                    Repository.modificarMedicamento(med) { m ->
+                                        val ahora = LocalDateTime.now()
+                                        val nuevasTomasList = m.historialTomas.toMutableList()
+                                        nuevasTomasList.add(ahora)
+                                        m.copy(
+                                            ultimaToma = ahora,
+                                            historialTomas = nuevasTomasList
+                                        )
                                     }
-                                )
+                                    snackbarHostState.showSnackbar("${med.nombre} marcado como tomado")
+                                }
                             }
                         )
                     }
@@ -584,6 +665,11 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
 
     var nombreError by remember { mutableStateOf(false) }
     var dosisError by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    val catalogo by Repository.catalogoFlow.collectAsState()
+    val medicamentos by Repository.medicamentosFlow.collectAsState()
 
     val formatos = mapOf(
         "Pastillas" to "pastilla(s)",
@@ -618,7 +704,7 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
         Text("Programar Medicamento", fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(20.dp))
 
-        if (Repository.catalogo.isNotEmpty()) {
+        if (catalogo.isNotEmpty()) {
             Box {
                 OutlinedButton(
                     onClick = { showCatalogMenu = true },
@@ -630,7 +716,7 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
                     expanded = showCatalogMenu,
                     onDismissRequest = { showCatalogMenu = false }
                 ) {
-                    Repository.catalogo.forEach { med ->
+                    catalogo.forEach { med ->
                         DropdownMenuItem(
                             text = { Text("${med.nombre} - ${med.dosis}", fontSize = 16.sp) },
                             onClick = {
@@ -664,7 +750,8 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
             label = { Text("Nombre", fontSize = 18.sp) },
             isError = nombreError,
             modifier = Modifier.fillMaxWidth().height(70.dp),
-            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp)
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp),
+            enabled = !isLoading
         )
         if (nombreError) {
             Text("El nombre es obligatorio", color = Color.Red, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp))
@@ -674,7 +761,8 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
         Box {
             OutlinedButton(
                 onClick = { menuFormatoOpen = true },
-                modifier = Modifier.fillMaxWidth().height(70.dp)
+                modifier = Modifier.fillMaxWidth().height(70.dp),
+                enabled = !isLoading
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -716,12 +804,13 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
             modifier = Modifier.fillMaxWidth().height(70.dp),
             textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            suffix = { Text(formatos[formatoSeleccionado] ?: "", fontSize = 16.sp, color = Color.Gray) }
+            suffix = { Text(formatos[formatoSeleccionado] ?: "", fontSize = 16.sp, color = Color.Gray) },
+            enabled = !isLoading
         )
         if (dosisError) {
             Text("La cantidad es obligatoria", color = Color.Red, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp))
         }
-        
+
         Spacer(modifier = Modifier.height(20.dp))
         Text("Intervalo de tomas (horas):", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Spacer(modifier = Modifier.height(12.dp))
@@ -734,7 +823,8 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
                     selected = intervaloSelected == hours,
                     onClick = { intervaloSelected = hours },
                     label = { Text("${hours}h", fontSize = 16.sp, fontWeight = FontWeight.Medium) },
-                    modifier = Modifier.height(48.dp)
+                    modifier = Modifier.height(48.dp),
+                    enabled = !isLoading
                 )
             }
         }
@@ -744,11 +834,12 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedButton(
             onClick = { showTimePicker = true },
-            modifier = Modifier.fillMaxWidth().height(64.dp)
+            modifier = Modifier.fillMaxWidth().height(64.dp),
+            enabled = !isLoading
         ) {
             Text(selectedTime.format(DateTimeFormatter.ofPattern("HH:mm")), fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
-        
+
         Spacer(modifier = Modifier.height(8.dp))
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -756,7 +847,7 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
                 .fillMaxWidth()
                 .padding(vertical = 8.dp)
         ) {
-            Checkbox(checked = diario, onCheckedChange = { diario = it })
+            Checkbox(checked = diario, onCheckedChange = { diario = it }, enabled = !isLoading)
             Spacer(modifier = Modifier.width(8.dp))
             Text("Repetir diariamente", fontSize = 18.sp, fontWeight = FontWeight.Medium)
         }
@@ -770,31 +861,42 @@ fun MedicationFormView(onSaved: () -> Unit, onBack: () -> Unit = {}) {
                 )
 
                 if (esValido) {
-                    executeWithTryCatch(Unit) {
+                    isLoading = true
+                    scope.launch {
                         val dosisCompleta = "$cantidadDosis ${formatos[formatoSeleccionado]}"
                         Repository.agregarMedicamento(Medicamento(nombre, dosisCompleta, intervaloSelected, selectedTime, diario))
+                        isLoading = false
                         onSaved()
                     }
                 }
             },
-            modifier = Modifier.fillMaxWidth().height(64.dp)
+            modifier = Modifier.fillMaxWidth().height(64.dp),
+            enabled = !isLoading
         ) {
-            Text("Guardar Medicamento", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Guardar Medicamento", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
         OutlinedButton(
             onClick = onBack,
-            modifier = Modifier.fillMaxWidth().height(60.dp)
+            modifier = Modifier.fillMaxWidth().height(60.dp),
+            enabled = !isLoading
         ) {
             Text("Cancelar", fontSize = 18.sp)
         }
 
-        if (Repository.medicamentos.isNotEmpty()) {
+        if (medicamentos.isNotEmpty()) {
             Spacer(modifier = Modifier.height(32.dp))
             Text("Medicamentos ingresados:", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            Repository.medicamentos.forEach {
+            medicamentos.forEach {
                 Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Text("• ${it.nombre} (${it.dosis}) cada ${it.intervaloHoras}h", fontSize = 16.sp, modifier = Modifier.padding(12.dp))
                 }
@@ -810,6 +912,10 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
     var cantidadDosis by remember { mutableStateOf("") }
     var formatoSeleccionado by remember { mutableStateOf("Pastillas") }
     var menuFormatoOpen by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    val catalogo by Repository.catalogoFlow.collectAsState()
 
     val formatos = mapOf(
         "Pastillas" to "pastilla(s)",
@@ -879,29 +985,44 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         suffix = { Text(formatos[formatoSeleccionado] ?: "", fontSize = 14.sp, color = Color.Gray) }
                     )
+
+                    if (isLoading) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    if (nombre.isNotBlank() && cantidadDosis.isNotBlank()) {
-                        val dosisCompleta = "$cantidadDosis ${formatos[formatoSeleccionado]}"
-                        Repository.agregarAlCatalogo(MedicamentoCatalogo(nombre, dosisCompleta))
-                        nombre = ""
-                        cantidadDosis = ""
-                        formatoSeleccionado = "Pastillas"
-                        showDialog = false
-                    }
-                }) {
+                TextButton(
+                    onClick = {
+                        if (nombre.isNotBlank() && cantidadDosis.isNotBlank()) {
+                            isLoading = true
+                            scope.launch {
+                                val dosisCompleta = "$cantidadDosis ${formatos[formatoSeleccionado]}"
+                                Repository.agregarAlCatalogo(MedicamentoCatalogo(nombre, dosisCompleta))
+                                nombre = ""
+                                cantidadDosis = ""
+                                formatoSeleccionado = "Pastillas"
+                                isLoading = false
+                                showDialog = false
+                            }
+                        }
+                    },
+                    enabled = !isLoading
+                ) {
                     Text("Guardar", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showDialog = false
-                    nombre = ""
-                    cantidadDosis = ""
-                    formatoSeleccionado = "Pastillas"
-                }) {
+                TextButton(
+                    onClick = {
+                        showDialog = false
+                        nombre = ""
+                        cantidadDosis = ""
+                        formatoSeleccionado = "Pastillas"
+                    },
+                    enabled = !isLoading
+                ) {
                     Text("Cancelar", fontSize = 16.sp)
                 }
             }
@@ -912,7 +1033,7 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
         Text("Mis Medicamentos", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(modifier = Modifier.height(20.dp))
 
-        if (Repository.catalogo.isEmpty()) {
+        if (catalogo.isEmpty()) {
             Box(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -930,7 +1051,7 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(Repository.catalogo) { med ->
+                items(catalogo) { med ->
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(med.nombre, fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -961,7 +1082,8 @@ fun MyMedicinesView(onNavigateToHome: () -> Unit = {}) {
 
 @Composable
 fun HistorialView() {
-    val allTomas = Repository.medicamentos.flatMap { med ->
+    val medicamentos by Repository.medicamentosFlow.collectAsState()
+    val allTomas = medicamentos.flatMap { med ->
         med.historialTomas.map { toma ->
             Triple(med.nombre, med.dosis, toma)
         }
